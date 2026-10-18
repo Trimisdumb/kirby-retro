@@ -14,7 +14,7 @@ import socket
 import subprocess
 from pathlib import Path
 
-from .config import config_dir
+from .config import config_dir, subprocess_env
 
 DEFAULT_PORT = 55435
 
@@ -42,6 +42,7 @@ def tailscale_address() -> str | None:
             text=True,
             timeout=6,
             check=False,
+            env=subprocess_env(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

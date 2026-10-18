@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .config import subprocess_env
+
 SCHEME = "kirbyretro"
 
 
@@ -87,7 +89,7 @@ def install_linux() -> str:
         ["update-desktop-database", str(desktop.parent)],
     ):
         try:
-            subprocess.run(cmd, capture_output=True, timeout=20, check=False)
+            subprocess.run(cmd, capture_output=True, timeout=20, check=False, env=subprocess_env())
         except OSError:
             pass  # outils absents : le fichier .desktop suffit dans la plupart des environnements
 
@@ -181,6 +183,7 @@ def status() -> str:
             timeout=10,
             check=False,
             text=True,
+            env=subprocess_env(),
         )
         registered = (out.stdout or "").strip() or "?"
     except OSError:

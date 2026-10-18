@@ -11,6 +11,15 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.8.2
+
+- **Correctif Linux — connexion** : le binaire autonome utilise désormais les certificats
+  de la distribution hôte (Fedora, openSUSE, Arch…) ; sur ces systèmes, la connexion au
+  site échouait en SSL et la bibliothèque ne se chargeait pas (magasin embarqué en secours).
+- **Correctif Linux — lancement des jeux** : les outils lancés (RetroArch Flatpak, émulateurs
+  natifs…) ne reçoivent plus les bibliothèques embarquées du launcher ; sur Fedora et Arch,
+  le lancement échouait avec une erreur de version d'OpenSSL.
+
 ## Nouveautés v1.8.1
 
 - **Exécutables autonomes** : le launcher se télécharge en **`.exe` Windows** ou **binaire Linux** — Python n'est plus à installer chez le joueur (tout est embarqué). Les archives Python (.zip / .tar.gz) restent disponibles.

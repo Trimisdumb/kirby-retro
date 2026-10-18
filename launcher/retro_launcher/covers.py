@@ -7,7 +7,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from .config import cache_dir
+from .config import cache_dir, ensure_ca_bundle
+
+ensure_ca_bundle()
 
 # UA « navigateur » : Cloudflare (erreur 1010) refuse les UA exotiques.
 USER_AGENT = (

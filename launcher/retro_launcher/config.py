@@ -38,6 +38,46 @@ def cache_dir() -> Path:
     return path
 
 
+# Magasins de certificats usuels (OpenSSL embarqué : chemins Debian compilés en dur).
+_CA_BUNDLES = (
+    "/etc/ssl/certs/ca-certificates.crt",  # Debian, Ubuntu, Fedora, Arch…
+    "/etc/pki/tls/certs/ca-bundle.crt",  # RHEL / Fedora (classique)
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",  # Fedora / RHEL (ca-trust)
+    "/etc/ssl/ca-bundle.pem",  # openSUSE
+    "/etc/ssl/cert.pem",  # Alpine, macOS
+)
+
+
+def ensure_ca_bundle() -> None:
+    """Binaire autonome : l'OpenSSL embarqué ne connaît que les chemins de la
+    machine de construction (Debian). On pointe SSL_CERT_FILE vers un magasin
+    présent sur la machine, sinon vers la copie fournie dans le binaire."""
+    if not getattr(sys, "frozen", False) or not sys.platform.startswith("linux"):
+        return
+    if os.environ.get("SSL_CERT_FILE"):
+        return
+    candidates = list(_CA_BUNDLES)
+    meipass = getattr(sys, "_MEIPASS", "")
+    if meipass:
+        candidates.append(str(Path(meipass) / "certs" / "ca-certificates.crt"))
+    for candidate in candidates:
+        if Path(candidate).is_file():
+            os.environ["SSL_CERT_FILE"] = candidate
+            return
+
+
+def subprocess_env() -> dict[str, str]:
+    """Environnement des outils lancés (flatpak, RetroArch, xdg-mime…).
+
+    L'exécutable autonome exporte LD_LIBRARY_PATH vers ses bibliothèques
+    embarquées (Debian) : les binaires système les prendraient à tort, d'où des
+    erreurs de version d'OpenSSL sur Fedora, Arch… On les lance donc sans."""
+    env = dict(os.environ)
+    if getattr(sys, "frozen", False) and sys.platform.startswith("linux"):
+        env.pop("LD_LIBRARY_PATH", None)
+    return env
+
+
 def default_config() -> dict[str, Any]:
     return {
         "site_url": "https://retro.kirbytrim.buzz",

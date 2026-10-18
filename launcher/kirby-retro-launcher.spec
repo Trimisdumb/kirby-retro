@@ -8,11 +8,18 @@ requise chez le joueur. GitHub Actions utilise ce même fichier pour publier
 le .exe Windows et le binaire Linux (voir .github/workflows/build-launcher.yml).
 """
 
+import os
+
+# Copie de secours des certificats (Linux) : utilisée si la machine du joueur
+# n'a pas de magasin à l'emplacement attendu par l'OpenSSL embarqué.
+_CA_BUNDLE = "/etc/ssl/certs/ca-certificates.crt"
+_datas = [(_CA_BUNDLE, "certs")] if os.path.exists(_CA_BUNDLE) else []
+
 a = Analysis(
     ["kirby_retro_launcher.py"],
     pathex=["."],
     binaries=[],
-    datas=[],
+    datas=_datas,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -7,6 +7,10 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from .config import ensure_ca_bundle
+
+ensure_ca_bundle()
+
 
 def fetch_library(site_url: str, timeout: float = 30.0) -> dict[str, Any]:
     base = site_url.rstrip("/")

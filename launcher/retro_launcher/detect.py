@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from .config import subprocess_env
 from .cores import NATIVE_HINTS, RETROARCH_CORES
 
 FLATPAK_ID = "org.libretro.RetroArch"
@@ -74,6 +75,7 @@ def find_flatpak_retroarch() -> str | None:
             [flatpak, "info", FLATPAK_ID],
             capture_output=True,
             timeout=20,
+            env=subprocess_env(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

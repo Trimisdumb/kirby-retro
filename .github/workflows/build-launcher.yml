@@ -11,17 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        platform: [windows, linux]
-        include:
-          - platform: windows
-            os: windows-latest
-          - platform: linux
-            os: ubuntu-latest
-    runs-on: ${{ matrix.os }}
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -48,14 +39,47 @@ jobs:
         working-directory: launcher
         run: |
           mkdir -p out
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            mv dist/kirby-retro-launcher.exe "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-windows.exe"
-          else
-            mv dist/kirby-retro-launcher "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-linux"
-          fi
+          mv dist/kirby-retro-launcher.exe "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-windows.exe"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kirby-retro-launcher-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          name: kirby-retro-launcher-${{ steps.version.outputs.version }}-windows
+          path: launcher/out/*
+          if-no-files-found: error
+
+  linux:
+    # Debian stable : glibc 2.36, compatible avec la plupart des distributions récentes.
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - name: Dépendances
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3 python3-pip python3-tk ca-certificates binutils libpython3.11
+
+      - uses: actions/checkout@v4
+
+      - name: Version du launcher
+        id: version
+        run: |
+          VERSION=$(PYTHONPATH=launcher python3 -c "import retro_launcher; print(retro_launcher.__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: PyInstaller
+        run: python3 -m pip install --break-system-packages --disable-pip-version-check pyinstaller
+
+      - name: Construction
+        working-directory: launcher
+        run: pyinstaller --clean --noconfirm kirby-retro-launcher.spec
+
+      - name: Renommage
+        working-directory: launcher
+        run: |
+          mkdir -p out
+          mv dist/kirby-retro-launcher "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-linux"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kirby-retro-launcher-${{ steps.version.outputs.version }}-linux
           path: launcher/out/*
           if-no-files-found: error

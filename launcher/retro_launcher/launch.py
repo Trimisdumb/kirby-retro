@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .api import download_rom
+from .config import subprocess_env
 from .cores import RETROARCH_CORES
 from .detect import cores_dirs, is_flatpak, resolve_core_path, retroarch_executable_ok
 from .netplay import DEFAULT_PORT as NETPLAY_DEFAULT_PORT, write_appendconfig
@@ -61,10 +62,11 @@ def _run(cmd: list[str], cwd: str | None = None) -> None:
     if not cmd or not cmd[0]:
         raise LaunchError("Commande d'émulateur vide.")
     try:
+        env = subprocess_env()
         if sys.platform == "win32":
-            subprocess.Popen(cmd, cwd=cwd, close_fds=True)
+            subprocess.Popen(cmd, cwd=cwd, close_fds=True, env=env)
         else:
-            subprocess.Popen(cmd, cwd=cwd, close_fds=True, start_new_session=True)
+            subprocess.Popen(cmd, cwd=cwd, close_fds=True, start_new_session=True, env=env)
     except OSError as exc:
         raise LaunchError(f"Impossible de lancer :\n{' '.join(cmd)}\n{exc}") from exc
 

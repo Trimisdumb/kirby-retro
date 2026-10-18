@@ -14,6 +14,7 @@ import sys
 import threading
 from typing import Any
 
+from .config import subprocess_env
 from .launch import LaunchError, launch_game
 
 BG = "#e8f6fc"
@@ -35,6 +36,7 @@ def notify_error(message: str) -> None:
                 ["notify-send", "-a", "Kirby Retro Launcher", "-u", "critical", "Échec du lancement", first],
                 timeout=10,
                 check=False,
+                env=subprocess_env(),
             )
         except OSError:
             pass
