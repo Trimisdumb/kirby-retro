@@ -11,6 +11,11 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.8.1
+
+- **Exécutables autonomes** : le launcher se télécharge en **`.exe` Windows** ou **binaire Linux** — Python n'est plus à installer chez le joueur (tout est embarqué). Les archives Python (.zip / .tar.gz) restent disponibles.
+- Avec l'exécutable, les liens `kirbyretro://` sont enregistrés directement vers le binaire (mêmes fonctions qu'avec les scripts).
+
 ## Nouveautés v1.8.0
 
 - **Sauvegardes trouvées automatiquement, partout** : RetroArch (y compris ses dossiers « par core » — `saves/melonDS DS/…`, `saves/Mupen64Plus-Next/…`, NAND de Dolphin) **et** les émulateurs natifs installés (melonDS, Dolphin flatpak/dossier, simple64, mupen64plus, DuckStation, FCEUX…). La liste indique la provenance de chaque sauvegarde.
@@ -55,10 +60,12 @@ Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
 ## Prérequis
 
-- **Python 3.10+** (stdlib uniquement, aucune dépendance pip obligatoire)
-- **tkinter** (interface graphique) : livré avec Python sur Windows/macOS ; sur Linux :
-  - Fedora : `sudo dnf install python3-tkinter`
-  - Debian/Ubuntu : `sudo apt install python3-tk`
+- **Exécutable autonome** (recommandé, téléchargé sur le site) : rien d'autre à installer — Python et tkinter sont embarqués.
+- **Version Python** (archives .zip/.tar.gz ou dépôt) :
+  - **Python 3.10+** (stdlib uniquement, aucune dépendance pip obligatoire)
+  - **tkinter** (interface graphique) : livré avec Python sur Windows/macOS ; sur Linux :
+    - Fedora : `sudo dnf install python3-tkinter`
+    - Debian/Ubuntu : `sudo apt install python3-tk`
 - **RetroArch** + cores libretro  
   - Linux : `sudo dnf install retroarch` / `sudo apt install retroarch` ou Flatpak  
   - Windows / macOS : [retroarch.com](https://www.retroarch.com/) → Online Updater → Manage Cores
@@ -90,10 +97,24 @@ Pour tout changer : **Paramètres** →
 | RetroArch | chemin vers `retroarch` / `retroarch.exe` |
 | Dossier cores | dossier des `*_libretro.so` / `.dll` |
 
+## Exécutable autonome
+
+Les versions publiées sur le site sont construites avec PyInstaller (Python embarqué) :
+
+```bash
+cd launcher
+pip install pyinstaller
+pyinstaller --clean --noconfirm kirby-retro-launcher.spec
+```
+
+Le binaire sort dans `dist/`. Le même spec sert pour Windows et Linux ; GitHub Actions construit
+les deux à la demande ou à chaque tag `launcher-v*` (onglet **Actions → « Exécutables du launcher »**).
+
 ## Lancer un jeu en ligne de commande
 
 ```bash
-./run.sh play nds "Mario Kart DS (Europe).zip"
+./run.sh play nds "Mario Kart DS (Europe).zip"                  # version Python
+./kirby-retro-launcher play nds "Mario Kart DS (Europe).zip"    # exécutable
 ./run.sh play --url "kirbyretro://play?system=n64&file=Super%20Mario%2064.zip"
 ```
 
@@ -188,9 +209,12 @@ Puis : `xdg-mime default kirbyretro.desktop x-scheme-handler/kirbyretro`
 En cas de souci (jeu qui ne se lance pas, RetroArch introuvable…) :
 
 ```bash
-./run.sh doctor      # Linux / macOS
-run.bat doctor       # Windows
+./run.sh doctor                # version Python (Linux / macOS)
+run.bat doctor                 # version Python (Windows)
+./kirby-retro-launcher doctor  # exécutable Linux / macOS
 ```
+
+Avec le `.exe` Windows (fenêtré), même diagnostic dans l’interface : **Paramètres → Diagnostic**.
 
 Affiche : config, accès au site, interface tkinter, dossier ROMs, RetroArch, **dossiers de cores explorés**,
 cores manquants par console, émulateurs natifs détectés et état du protocole `kirbyretro://`.

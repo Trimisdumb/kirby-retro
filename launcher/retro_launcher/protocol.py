@@ -13,6 +13,19 @@ def launcher_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _frozen_exe() -> str | None:
+    """Chemin du binaire autonome (PyInstaller), ou None en mode source."""
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    return None
+
+
+def _install_hint() -> str:
+    if _frozen_exe() is not None:
+        return "kirby-retro-launcher install-protocol"
+    return "run.bat install-protocol" if sys.platform == "win32" else "./run.sh install-protocol"
+
+
 # --------------------------------------------------------------------- Linux
 
 def _desktop_escape(value: str) -> str:
@@ -28,15 +41,18 @@ def _linux_desktop_path() -> Path:
 
 
 def install_linux() -> str:
-    run_sh = launcher_root() / "run.sh"
-    if not run_sh.is_file():
-        raise FileNotFoundError(f"run.sh introuvable : {run_sh}")
-    try:  # pas indispensable (on passe par bash) mais pratique pour ./run.sh direct
-        run_sh.chmod(run_sh.stat().st_mode | 0o111)
-    except OSError:
-        pass
-
-    exec_line = f'bash "{_desktop_escape(str(run_sh))}" play --url %u'
+    exe = _frozen_exe()
+    if exe:
+        exec_line = f'"{_desktop_escape(exe)}" play --url %u'
+    else:
+        run_sh = launcher_root() / "run.sh"
+        if not run_sh.is_file():
+            raise FileNotFoundError(f"run.sh introuvable : {run_sh}")
+        try:  # pas indispensable (on passe par bash) mais pratique pour ./run.sh direct
+            run_sh.chmod(run_sh.stat().st_mode | 0o111)
+        except OSError:
+            pass
+        exec_line = f'bash "{_desktop_escape(str(run_sh))}" play --url %u'
     desktop = _linux_desktop_path()
     desktop.write_text(
         "\n".join(
@@ -85,6 +101,9 @@ def install_linux() -> str:
 # ------------------------------------------------------------------- Windows
 
 def _windows_command() -> str:
+    exe = _frozen_exe()
+    if exe:
+        return f'"{exe}" play --url "%1"'
     run_bat = launcher_root() / "run.bat"
     # Forme conseillée par Microsoft pour lancer un .bat depuis le registre :
     # cmd /c ""chemin\run.bat" play --url "%1""
@@ -127,7 +146,7 @@ def _status_windows() -> str:
                     return f"[OK] enregistré ({name}) → {command}"
             except OSError:
                 continue
-        return "[--] non enregistré — lance « run.bat install-protocol »"
+        return f"[--] non enregistré — lance « {_install_hint()} »"
     except ImportError:
         return "[--] hors Windows"
 
@@ -153,7 +172,7 @@ def status() -> str:
         return "[--] vérification automatique non prise en charge (macOS)"
     desktop = _linux_desktop_path()
     if not desktop.is_file():
-        return "[--] non enregistré — lance « ./run.sh install-protocol »"
+        return f"[--] non enregistré — lance « {_install_hint()} »"
     registered = "?"
     try:
         out = subprocess.run(

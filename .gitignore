@@ -16,6 +16,11 @@ public/downloads/*.tar.gz
 __pycache__/
 *.pyc
 
+# PyInstaller
+launcher/build/
+launcher/dist/
+launcher/out/
+
 # Divers
 node_modules/
 *.log

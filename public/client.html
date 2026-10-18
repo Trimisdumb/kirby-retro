@@ -64,34 +64,34 @@
       <p class="muted">
         Le navigateur suffit pour la plupart des consoles — mais la <strong>DS</strong>, la <strong>N64</strong> et
         la <strong>PSX</strong> sont bien plus fluides avec un émulateur natif. Ce petit client
-        (Python + Tkinter) reprend la bibliothèque du site et lance chaque jeu dans
+        <strong>tout-en-un</strong> (rien à installer) reprend la bibliothèque du site et lance chaque jeu dans
         <a href="https://www.retroarch.com/" target="_blank" rel="noreferrer">RetroArch</a> ou un émulateur
         standalone (melonDS, DuckStation…). Les ROMs absentes se téléchargent automatiquement depuis le site.
       </p>
       <p class="hint" style="margin-top:-2px">
-        <strong>Nouveau en 1.8.0 :</strong> <strong>sauvegardes détectées automatiquement</strong> — RetroArch
-        (y compris « par core » : melonDS DS, Mupen64Plus-Next, NAND Dolphin) et émulateurs natifs
-        (melonDS, Dolphin…) — puis <strong>importées au lancement</strong> dans l'émulateur utilisé,
-        la plus récente gagne.
+        <strong>Nouveau en 1.8.1 :</strong> versions <strong>exécutables autonomes</strong> — Windows (.exe) et Linux —
+        <strong>Python n'est plus à installer</strong>. Et depuis 1.8.0 : <strong>sauvegardes détectées
+        automatiquement</strong> (RetroArch par core, melonDS, Dolphin…) puis <strong>importées au lancement</strong>.
         <br><small>(1.7.0 : interface plus sobre. 1.6.0 : bouton <strong>SAUVEGARDES</strong>.)</small>
       </p>
       <div class="dl-grid">
         <div class="dl-card" id="dl-win">
           <strong>🪟 Windows 10 / 11</strong>
-          <p>Archive ZIP — extrais, puis double-clic sur <code class="inline-code">run.bat</code>.</p>
-          <a class="btn" href="/downloads/kirby-retro-launcher-1.8.0.zip" download>⬇ Télécharger le client (.zip)</a>
+          <p>Un seul fichier — télécharge et double-clique. <small>(Windows peut afficher « Windows a protégé
+          votre PC » : <em>Informations → Exécuter quand même</em>.)</small></p>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.8.1-windows.exe" download>⬇ Télécharger le launcher (.exe)</a>
         </div>
         <div class="dl-card" id="dl-linux">
           <strong>🐧 Linux</strong>
-          <p>Archive tar.gz — extrais, puis <code class="inline-code">./run.sh</code>.</p>
-          <a class="btn" href="/downloads/kirby-retro-launcher-1.8.0.tar.gz" download>⬇ Télécharger le client (.tar.gz)</a>
+          <p>Un seul fichier — rends-le exécutable, puis lance-le. <small><code class="inline-code">chmod +x …</code></small></p>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.8.1-linux" download>⬇ Télécharger le launcher (binaire)</a>
         </div>
       </div>
       <p class="hint">
-        Même code pour les deux systèmes. Prérequis : <strong>Python 3.10+</strong> et <strong>RetroArch + cores</strong>
-        (gratuits). Aucune dépendance Python à installer, rien à compiler. Sous Linux, installe aussi tkinter
-        (<code class="inline-code">sudo dnf install python3-tkinter</code> ou
-        <code class="inline-code">sudo apt install python3-tk</code>) pour l'interface.
+        Rien à installer à côté pour le launcher lui-même ; <strong>RetroArch + cores</strong> restent nécessaires
+        (gratuits) et sont détectés automatiquement. Version Python (si tu préfères) :
+        <a href="/downloads/kirby-retro-launcher-1.8.1.zip">.zip (Windows)</a> ·
+        <a href="/downloads/kirby-retro-launcher-1.8.1.tar.gz">.tar.gz (Linux)</a> — Python 3.10+ et tkinter requis.
       </p>
     </section>
 
@@ -99,9 +99,10 @@
       <h2>🪟 Installation — Windows</h2>
       <ol>
         <li>
-          <strong>Installe Python</strong> — <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noreferrer">python.org/downloads/windows</a>
-          (version 3.10 ou plus récente). Pendant l'installation, coche bien
-          <strong>« Add python.exe to PATH »</strong>.
+          <strong>Télécharge le launcher</strong> (bouton .exe ci-dessus) et pose-le où tu veux
+          (ex. <code class="inline-code">Documents\</code>) — c'est un fichier unique, aucune installation.
+          Au premier lancement, Windows peut afficher un avertissement (fichier non signé) :
+          <em>Informations → Exécuter quand même</em>.
         </li>
         <li>
           <strong>Installe RetroArch</strong> — <a href="https://www.retroarch.com/" target="_blank" rel="noreferrer">retroarch.com</a>
@@ -110,11 +111,8 @@
           (voir la liste plus bas : melonDS DS pour la DS, Mupen64Plus-Next pour la N64…).
         </li>
         <li>
-          <strong>Télécharge le client</strong> (bouton .zip ci-dessus), puis clic droit sur le fichier →
-          <em>Extraire tout…</em> (n'importe où, ex. <code class="inline-code">Documents\kirby-retro-launcher</code>).
-        </li>
-        <li>
-          <strong>Lance-le</strong> — double-clic sur <code class="inline-code">run.bat</code>. La fenêtre s'ouvre,
+          <strong>Lance le launcher</strong> — double-clic sur
+          <code class="inline-code">kirby-retro-launcher-1.8.1-windows.exe</code>. La fenêtre s'ouvre,
           la bibliothèque se charge et RetroArch est détecté automatiquement.
         </li>
         <li>
@@ -135,8 +133,13 @@
       <h2>🐧 Installation — Linux</h2>
       <ol>
         <li>
-          <strong>Python 3.10+</strong> — déjà présent sur la plupart des distributions
-          (<code class="inline-code">python3 --version</code> pour vérifier).
+          <strong>Télécharge le launcher</strong> (bouton binaire ci-dessus), rends-le exécutable et lance-le :
+          <pre><code>chmod +x kirby-retro-launcher-1.8.1-linux
+./kirby-retro-launcher-1.8.1-linux</code></pre>
+          La bibliothèque se charge ; RetroArch et les cores sont détectés automatiquement : paquet système
+          (dnf/apt/pacman), Flatpak, snap, portable — cores cherchés dans
+          <code class="inline-code">~/.config/retroarch/cores</code>, <code class="inline-code">/usr/lib*/libretro</code>,
+          le dossier Flatpak, et celui déclaré dans <code class="inline-code">retroarch.cfg</code>.
         </li>
         <li>
           <strong>Installe RetroArch</strong> selon ta distribution :
@@ -152,21 +155,8 @@ flatpak install flathub org.libretro.RetroArch</code></pre>
           <code class="inline-code">libretro-*</code> de ta distribution).
         </li>
         <li>
-          <strong>Télécharge et extrais le client</strong> :
-          <pre><code>tar -xzf kirby-retro-launcher-1.8.0.tar.gz
-cd kirby-retro-launcher</code></pre>
-        </li>
-        <li>
-          <strong>Lance-le</strong> :
-          <pre><code>./run.sh</code></pre>
-          La bibliothèque se charge, RetroArch et les cores sont détectés automatiquement :
-          paquet système (dnf/apt/pacman), Flatpak, snap, portable — cores cherchés dans
-          <code class="inline-code">~/.config/retroarch/cores</code>, <code class="inline-code">/usr/lib*/libretro</code>,
-          le dossier Flatpak, et celui déclaré dans <code class="inline-code">retroarch.cfg</code>.
-        </li>
-        <li>
           <strong>(Recommandé) Associe les liens du site</strong> :
-          <pre><code>./run.sh install-protocol</code></pre>
+          <pre><code>./kirby-retro-launcher-1.8.1-linux install-protocol</code></pre>
           Aucun droit root nécessaire. Tu peux aussi le faire via
           <em>Paramètres → « Associer les liens kirbyretro:// »</em>.
         </li>
@@ -239,7 +229,7 @@ cd kirby-retro-launcher</code></pre>
       <details class="faq">
         <summary>Sur Linux : « Aucun émulateur configuré » ou « core introuvable »</summary>
         <p>
-          Mets à jour le launcher en <strong>1.8.0</strong> : il détecte RetroArch installé par
+          Mets à jour le launcher en <strong>1.8.1</strong> : il détecte RetroArch installé par
           <code class="inline-code">dnf</code>, <code class="inline-code">apt</code>, <code class="inline-code">pacman</code>,
           Flatpak, snap ou en archive, et cherche les cores dans <code class="inline-code">~/.config/retroarch/cores</code>,
           <code class="inline-code">/usr/lib*/libretro</code> et le dossier déclaré dans
@@ -280,7 +270,7 @@ cd kirby-retro-launcher</code></pre>
       <details class="faq">
         <summary>Comment jouer en ligne avec un ami ? (netplay)</summary>
         <p>
-          Mets à jour le launcher en <strong>1.8.0</strong> chez vous deux, puis :
+          Mets à jour le launcher en <strong>1.8.1</strong> chez vous deux, puis :
         </p>
         <ol>
           <li>L'un de vous sélectionne le jeu et clique <strong>🌐 En ligne → Héberger</strong>.</li>
@@ -337,7 +327,7 @@ cd kirby-retro-launcher</code></pre>
   <footer class="wrap foot">
     <div class="foot-row">
       <p><a href="/">← Retour à la bibliothèque</a> · <a href="/upload.html">Ajouter une ROM</a> · <a href="/licenses.html">licences</a></p>
-      <p class="muted">Kirby Retro Launcher v1.8.0</p>
+      <p class="muted">Kirby Retro Launcher v1.8.1</p>
     </div>
   </footer>
 
