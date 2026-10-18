@@ -125,7 +125,9 @@ Launcher natif multiplateforme (Python + Tkinter, sans dépendance) servi sur **
 - liens `kirbyretro://play?system=…&file=…` : enregistrement via
   `./run.sh install-protocol` / `run.bat install-protocol` (Linux `.desktop` + xdg-mime ;
   Windows `HKCU\Software\Classes\kirbyretro`, + HKLM si admin) ;
-- diagnostic intégré : `./run.sh doctor` / `run.bat doctor` (config, site, cores, protocole).
+- diagnostic intégré : `./run.sh doctor` / `run.bat doctor` (config, site, cores, protocole) ;
+- portage **C++/Qt 6** en cours dans `launcher-cpp/` (mêmes serveurs, même config) — la version
+  Python reste la version livrée le temps du portage.
 
 ## Stabilité et modes d'exécution
 

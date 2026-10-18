@@ -21,6 +21,9 @@ launcher/build/
 launcher/dist/
 launcher/out/
 
+# C++ / Qt
+launcher-cpp/build/
+
 # Divers
 node_modules/
 *.log

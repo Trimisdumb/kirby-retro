@@ -258,6 +258,13 @@ Stocké dans :
 | c64 | `vice_x64sc_libretro` (ou `vice_x64_libretro`) |
 | cpc / apple2 / pc88 / pokemini | `cap32` (`crocods`) / `applewin` / `quasi88` / `pokemini` |
 
+## Portage C++ (en cours)
+
+Une réécriture en **C++/Qt 6** (comme Dolphin, Cemu…) est en cours dans
+[`launcher-cpp/`](../launcher-cpp/) : mêmes API, mêmes chemins de configuration et
+de cache — les deux versions cohabitent. La version Python ci-dessus reste la
+version livrée le temps du portage.
+
 ## Pourquoi ce choix ?
 
 L’émulation DS/N64 dans le navigateur (WASM) reste limitée. Un launcher natif + RetroArch/melonDS donne de **vraies perfs**, manettes Linux/Windows fiables, et ton site continue de gérer catalogue, jaquettes et uploads.
