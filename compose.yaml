@@ -1,0 +1,27 @@
+services:
+  retro:
+    build: .
+    image: retro-site:local
+    container_name: retro-site
+    restart: unless-stopped
+    # Tourne avec l'uid/gid du propriétaire des dossiers pour que ROMs, jaquettes
+    # et base SQLite restent inscriptibles.
+    user: "${PUID:-1000}:${PGID:-1000}"
+    environment:
+      SITE_NAME: Retro
+      PORT: 8090
+      ROMS_DIR: /data/roms
+      EJS_DIR: /data/ejs
+      COVERS_DIR: /data/covers
+      STATE_DIR: /data/state
+      UPLOAD_TOKEN: ${UPLOAD_TOKEN:-}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-512}
+      NETPLAY_SERVER: ${NETPLAY_SERVER:-}
+      NETPLAY_ICE_SERVERS: ${NETPLAY_ICE_SERVERS:-}
+    volumes:
+      - ./roms:/data/roms
+      - ./ejs:/data/ejs:ro
+      - ./covers:/data/covers
+      - ./state:/data/state
+    ports:
+      - "127.0.0.1:8093:8090"

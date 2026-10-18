@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajouter une ROM — Retro</title>
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7ec8e8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/favicon-192.png">
+  <link rel="stylesheet" href="/style.css?v=20261018b">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap bar">
+      <a class="brand" href="/">
+        <img class="logo-img" src="/favicon.png" alt="">
+        <span class="brand-text"><strong>Retro</strong><small>Ajouter une ROM</small></span>
+      </a>
+      <a class="btn ghost" href="/">← Bibliothèque</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <h2>Déposer une ROM</h2>
+      <p class="muted">
+        Le fichier part dans <code>roms/&lt;console&gt;/</code> et sa jaquette est
+        récupérée automatiquement dans la foulée.
+        <strong>Les gros fichiers passent aussi</strong> (PSP, Wii, Dreamcast…) :
+        l'envoi se fait par morceaux de 64 Mo, ce qui contourne la limite de 100 Mo de Cloudflare.
+        Tu peux aussi copier directement sur le serveur (scp/SFTP) si c'est plus rapide pour toi.
+      </p>
+
+      <form id="form">
+        <div class="field">
+          <label for="token">Jeton d'administration</label>
+          <input id="token" type="password" placeholder="UPLOAD_TOKEN du .env" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="system">Console</label>
+          <select id="system"></select>
+        </div>
+        <div class="field">
+          <label for="file">Fichier</label>
+          <input id="file" type="file">
+        </div>
+        <button class="btn" type="submit" id="submit">Envoyer</button>
+        <div class="progress" hidden id="progress-wrap"><i id="progress"></i></div>
+        <p class="msg" id="msg"></p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Jaquettes</h2>
+      <p class="muted" id="cover-stats">Chargement…</p>
+      <div class="field">
+        <label for="cover-system">Limiter à une console (optionnel)</label>
+        <select id="cover-system"><option value="">Toutes</option></select>
+      </div>
+      <button class="btn ghost" type="button" id="cover-refresh">🖼️ Récupérer les jaquettes manquantes</button>
+      <p class="msg" id="cover-msg"></p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <p>N'envoie que des ROMs que tu as le droit d'utiliser (tes propres dumps, homebrews libres).</p>
+    <p class="muted"><a href="/client.html">Client PC (launcher)</a> · <a href="/licenses.html">licences</a></p>
+  </footer>
+
+  <script type="module">
+    const form = document.getElementById("form");
+    const tokenInput = document.getElementById("token");
+    const systemSelect = document.getElementById("system");
+    const fileInput = document.getElementById("file");
+    const submit = document.getElementById("submit");
+    const msg = document.getElementById("msg");
+    const progressWrap = document.getElementById("progress-wrap");
+    const progress = document.getElementById("progress");
+    const coverStats = document.getElementById("cover-stats");
+    const coverMsg = document.getElementById("cover-msg");
+    const coverRefresh = document.getElementById("cover-refresh");
+    const coverSystem = document.getElementById("cover-system");
+
+    const setMessage = (element, text, kind = "") => {
+      element.textContent = text;
+      element.className = `msg ${kind}`;
+    };
+
+    const library = await fetch("/api/library").then((response) => response.json());
+    // Chaque morceau reste sous la limite Cloudflare (100 Mo). ?chunk=N (Mo) pour
+    // tester/ajuster ; le serveur accepte 96 Mo max par morceau.
+    const CHUNK_MB = Math.min(96, Math.max(2, Number(new URLSearchParams(location.search).get("chunk")) || 64));
+    const CHUNK_SIZE = CHUNK_MB * 1048576;
+    if (!library.uploadEnabled) {
+      setMessage(msg, "Dépôt désactivé : renseigne UPLOAD_TOKEN dans le .env du serveur.", "err");
+      submit.disabled = true;
+      coverRefresh.disabled = true;
+    }
+
+    for (const system of library.systems) {
+      const option = document.createElement("option");
+      option.value = system.id;
+      option.textContent = `${system.label} (.${system.extensions.join(", .")})`;
+      systemSelect.append(option);
+
+      const coverOption = document.createElement("option");
+      coverOption.value = system.id;
+      coverOption.textContent = `${system.label} (${system.count})`;
+      coverSystem.append(coverOption);
+    }
+
+    tokenInput.value = localStorage.getItem("retro-upload-token") || "";
+
+    const paintCovers = (covers) => {
+      if (!covers) return;
+      const done = covers.summary?.found ? ` · ${covers.summary.found} récupérée(s) au dernier passage` : "";
+      coverStats.innerHTML = covers.running
+        ? `<span class="pulse"></span> Récupération en cours (${covers.total} jeu(x))…`
+        : `<strong>${covers.withCover}</strong> jaquette(s) disponible(s) · <strong>${covers.withoutCover}</strong> sans image${done}`;
+    };
+
+    paintCovers(library.covers);
+
+    /** Envoie un morceau (XHR pour avoir la progression fine). */
+    function sendChunk(url, token, blob, onLoaded) {
+      return new Promise((resolve, reject) => {
+        const request = new XMLHttpRequest();
+        request.open("POST", url);
+        request.setRequestHeader("x-upload-token", token);
+        request.upload.addEventListener("progress", (progressEvent) => {
+          if (progressEvent.lengthComputable) onLoaded(progressEvent.loaded);
+        });
+        request.addEventListener("load", () => {
+          let payload = {};
+          try { payload = JSON.parse(request.responseText); } catch { /* réponse non JSON */ }
+          if (request.status === 200 && payload.ok) resolve(payload);
+          else reject(new Error(payload.error || request.responseText || `HTTP ${request.status}`));
+        });
+        request.addEventListener("error", () => reject(new Error("Échec réseau pendant l'envoi.")));
+        request.send(blob);
+      });
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const token = tokenInput.value.trim();
+      const file = fileInput.files?.[0];
+      if (!token) return setMessage(msg, "Jeton manquant.", "err");
+      if (!file) return setMessage(msg, "Choisis un fichier.", "err");
+
+      localStorage.setItem("retro-upload-token", token);
+      submit.disabled = true;
+      progressWrap.hidden = false;
+      progress.style.width = "0%";
+
+      const startedAt = performance.now();
+      const paint = (loaded) => {
+        const done = Math.min(loaded, file.size);
+        progress.style.width = `${Math.round((done / file.size) * 100)}%`;
+        setMessage(
+          msg,
+          `Envoi… ${(done / 1048576).toFixed(1)} / ${(file.size / 1048576).toFixed(1)} Mo`
+          + ` (morceaux de ${CHUNK_MB} Mo)`,
+        );
+      };
+
+      try {
+        let offset = 0;
+        while (offset < file.size) {
+          const end = Math.min(offset + CHUNK_SIZE, file.size);
+          const blob = file.slice(offset, end);
+          const url = `/api/upload?system=${encodeURIComponent(systemSelect.value)}`
+            + `&name=${encodeURIComponent(file.name)}&offset=${offset}`
+            + (end >= file.size ? "&done=1" : "");
+          await sendChunk(url, token, blob, (loaded) => paint(offset + loaded));
+          offset = end;
+          paint(offset);
+        }
+        const seconds = (performance.now() - startedAt) / 1000;
+        setMessage(
+          msg,
+          `✅ ${file.name} ajouté (${(file.size / 1048576).toFixed(1)} Mo en ${seconds.toFixed(0)} s)`
+          + " — jaquette en cours de récupération.",
+          "ok",
+        );
+        form.reset();
+        tokenInput.value = token;
+        setTimeout(pollCovers, 1500);
+      } catch (error) {
+        setMessage(msg, `❌ ${error.message}`, "err");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    async function pollCovers() {
+      try {
+        const status = await fetch("/api/covers/status").then((response) => response.json());
+        paintCovers(status);
+        if (status.running) setTimeout(pollCovers, 2500);
+        else if (!coverRefresh.disabled) coverRefresh.disabled = false;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    coverRefresh.addEventListener("click", async () => {
+      const token = tokenInput.value.trim();
+      if (!token) return setMessage(coverMsg, "Renseigne d'abord le jeton d'administration.", "err");
+      localStorage.setItem("retro-upload-token", token);
+      coverRefresh.disabled = true;
+      setMessage(coverMsg, "Lancement de la récupération…");
+      try {
+        const system = coverSystem.value;
+        const response = await fetch(`/api/covers/refresh${system ? `?system=${encodeURIComponent(system)}` : ""}`, {
+          method: "POST",
+          headers: { "x-upload-token": token },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setMessage(coverMsg, `❌ ${payload.error || `HTTP ${response.status}`}`, "err");
+          coverRefresh.disabled = false;
+          return;
+        }
+        setMessage(coverMsg, "✅ Récupération lancée — les images apparaissent au fur et à mesure.", "ok");
+        pollCovers();
+      } catch (error) {
+        setMessage(coverMsg, `❌ ${error.message}`, "err");
+        coverRefresh.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

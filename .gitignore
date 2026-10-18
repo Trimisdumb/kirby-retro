@@ -1,0 +1,22 @@
+# Secrets — ne jamais versionner (voir .env.example)
+.env
+
+# Données locales : ROMs, bundle EmulatorJS, jaquettes, base SQLite
+roms/
+ejs/
+covers/
+state/
+data/
+
+# Archives du launcher : reconstruites depuis launcher/ (voir README)
+public/downloads/*.zip
+public/downloads/*.tar.gz
+
+# Python
+__pycache__/
+*.pyc
+
+# Divers
+node_modules/
+*.log
+.DS_Store

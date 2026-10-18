@@ -1,0 +1,3 @@
+# Aucune dépendance obligatoire : la stdlib Python 3.10+ suffit.
+# Optionnel si tu veux une GUI plus moderne plus tard :
+# customtkinter>=5.2.0

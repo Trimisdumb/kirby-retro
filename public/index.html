@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Retro — kirbytrim.buzz</title>
+  <meta name="description" content="Bibliothèque rétro jouable directement dans le navigateur : NES, SNES, Game Boy, GBA, Nintendo 64, DS, PlayStation, Mega Drive et plus.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7ec8e8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/favicon-192.png">
+  <link rel="stylesheet" href="/style.css?v=20261018b">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap bar">
+      <a class="brand" href="/">
+        <img class="logo-img" src="/favicon.png" alt="">
+        <span class="brand-text">
+          <strong>Retro</strong>
+          <small>kirbytrim.buzz</small>
+        </span>
+      </a>
+      <div class="tools">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          <input id="search" type="search" placeholder="Rechercher un jeu…" autocomplete="off" spellcheck="false" aria-label="Rechercher un jeu">
+          <kbd>/</kbd>
+        </label>
+        <a class="btn ghost" href="/upload.html" title="Ajouter une ROM">＋ ROM</a>
+      </div>
+    </div>
+    <nav class="wrap filters" id="chips" aria-label="Filtrer par console"></nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" id="hero" hidden>
+      <div class="hero-content">
+        <h1>Menu des jeux</h1>
+        <p>
+          Choisis une chaîne pour lancer un jeu — comme sur une Wii, directement dans le navigateur.
+        </p>
+        <div class="hero-meta" id="hero-meta"></div>
+      </div>
+    </section>
+
+    <section class="recent" id="recent" hidden>
+      <div class="recent-head">
+        <h2>Récemment joués</h2>
+        <span class="count" id="recent-count"></span>
+      </div>
+      <div class="recent-scroll" id="recent-list"></div>
+    </section>
+
+    <div class="toolbar">
+      <p class="stats" id="stats"><span class="pulse"></span> Chargement de la bibliothèque…</p>
+      <label class="visually-hidden" for="sort" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Trier</label>
+      <select class="sort-select" id="sort" aria-label="Trier les jeux" hidden>
+        <option value="default">Tri par défaut</option>
+        <option value="title">Titre A → Z</option>
+        <option value="title-desc">Titre Z → A</option>
+        <option value="year">Année (récent)</option>
+        <option value="size">Taille</option>
+      </select>
+    </div>
+
+    <div class="grid skeleton-grid" id="skeleton" aria-hidden="true"></div>
+
+    <div id="content"></div>
+
+    <section class="empty" id="empty" hidden>
+      <img class="empty-img" src="/favicon.png" alt="">
+      <h2>Rien à jouer ici</h2>
+      <p>
+        Dépose tes ROMs dans <code>roms/&lt;console&gt;/</code> sur le serveur,
+        ou via la page <a href="/upload.html">Ajouter une ROM</a>.
+      </p>
+      <p class="muted">
+        Aucune ROM de jeu commercial n'est fournie par le site : seuls tes propres dumps
+        (ou des homebrews libres) doivent y être déposés.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <div class="foot-row">
+      <p>
+        Émulation par <a href="https://github.com/EmulatorJS/EmulatorJS" target="_blank" rel="noreferrer">EmulatorJS</a> (GPLv3) ·
+        cores <a href="https://www.retroarch.com/" target="_blank" rel="noreferrer">RetroArch</a> ·
+        jaquettes <a href="https://thumbnails.libretro.com/" target="_blank" rel="noreferrer">libretro-thumbnails</a> ·
+        <a href="/client.html">client PC (launcher)</a> ·
+        <a href="/licenses.html">licences</a>
+      </p>
+      <p class="muted" id="foot-stats"></p>
+    </div>
+  </footer>
+
+  <script src="/app.js?v=20261018d" type="module"></script>
+</body>
+</html>

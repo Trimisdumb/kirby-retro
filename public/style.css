@@ -1,0 +1,1062 @@
+/* ==========================================================================
+   Retro — kirbytrim.buzz
+   Design inspiré du menu Nintendo Wii (channels, bleu doux, coins arrondis)
+   ========================================================================== */
+
+:root {
+  --wii-sky-top: #7ec8e8;
+  --wii-sky-mid: #b8dff0;
+  --wii-sky-bot: #e8f6fc;
+  --wii-white: #f7f9fc;
+  --wii-channel: #ffffff;
+  --wii-channel-edge: #d0d8e4;
+  --wii-channel-shadow: #8aabb8;
+  --wii-text: #2a3a4a;
+  --wii-muted: #5a7080;
+  --wii-blue: #3a9fd8;
+  --wii-blue-deep: #2b7eb0;
+  --wii-blue-soft: #e3f2fa;
+  --wii-accent: #4ec0e8;
+  --wii-green: #6cbc4a;
+  --wii-orange: #f0a030;
+  --wii-danger: #e07070;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 24px;
+  --font: "Segoe UI", "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+  --header-h: 3.8rem;
+  --ease: cubic-bezier(0.25, 0.8, 0.25, 1);
+  --channel-w: 168px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scrollbar-color: #a8c8d8 transparent;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* Ciel Wii : dégradé bleu doux + légère « perspective » bas */
+  background:
+    radial-gradient(ellipse 120% 60% at 50% -10%, #ffffff55, transparent 50%),
+    linear-gradient(180deg, var(--wii-sky-top) 0%, var(--wii-sky-mid) 42%, var(--wii-sky-bot) 100%);
+  background-attachment: fixed;
+  color: var(--wii-text);
+  font: 16px/1.5 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--wii-blue-deep); text-decoration: none; }
+a:hover { color: var(--wii-blue); text-decoration: underline; }
+
+h1, h2, h3 {
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--wii-text);
+}
+
+code {
+  background: #ffffffaa;
+  border: 1px solid var(--wii-channel-edge);
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  font-size: 0.86em;
+  font-family: var(--mono);
+  color: var(--wii-text);
+}
+
+.wrap { width: min(1180px, 94vw); margin-inline: auto; }
+.muted { color: var(--wii-muted); }
+
+/* --------------------------------------------------------------- header Wii */
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, #ffffffee 0%, #f0f6faee 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 2px solid #c5d8e4;
+  box-shadow: 0 2px 12px #2a608018;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  min-height: var(--header-h);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--wii-text);
+  min-width: 0;
+  flex-shrink: 0;
+}
+.brand:hover { text-decoration: none; color: var(--wii-text); }
+
+.logo-img {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: contain;
+  padding: 3px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  box-shadow: 0 2px 8px #2a608025;
+}
+
+.brand-mini { display: inline-flex; flex: 0 0 auto; }
+.brand-mini img {
+  width: 2.2rem;
+  height: 2.2rem;
+  object-fit: contain;
+  padding: 2px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #c5d8e4;
+}
+
+.brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.brand-text strong {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--wii-blue-deep);
+  text-transform: lowercase;
+}
+.brand-text small { color: var(--wii-muted); font-size: 0.72rem; font-weight: 500; }
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* search — pastille Wii */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem 0.4rem 0.9rem;
+  box-shadow: 0 2px 6px #2a608012;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.search:focus-within {
+  border-color: var(--wii-blue);
+  box-shadow: 0 0 0 3px #3a9fd833;
+}
+.search svg {
+  width: 1rem;
+  height: 1rem;
+  stroke: var(--wii-muted);
+  fill: none;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+.search input {
+  border: 0;
+  background: transparent;
+  color: var(--wii-text);
+  font: inherit;
+  font-size: 0.9rem;
+  width: min(220px, 32vw);
+  outline: none;
+  min-width: 0;
+}
+.search input::placeholder { color: #9ab0c0; }
+.search kbd {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: #9ab0c0;
+  background: var(--wii-blue-soft);
+  border: 1px solid #c5d8e4;
+  border-radius: 5px;
+  padding: 0.1rem 0.35rem;
+}
+
+/* boutons style Wii */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 2px solid var(--wii-blue);
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(180deg, #6ec4ec 0%, var(--wii-blue) 100%);
+  color: #fff;
+  text-shadow: 0 1px 0 #2a7aaa88;
+  box-shadow: 0 2px 0 #2b7eb0, 0 3px 8px #2a608025;
+  transition: transform 0.15s var(--ease), filter 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn:hover {
+  filter: brightness(1.06);
+  text-decoration: none;
+  color: #fff;
+}
+.btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #2b7eb0;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn.ghost {
+  background: #fff;
+  border-color: #c5d8e4;
+  color: var(--wii-text);
+  text-shadow: none;
+  box-shadow: 0 2px 6px #2a608012;
+}
+.btn.ghost:hover {
+  border-color: var(--wii-blue);
+  color: var(--wii-blue-deep);
+  filter: none;
+}
+
+.btn.sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  box-shadow: 0 1px 0 #2b7eb088, 0 2px 6px #2a608015;
+}
+
+/* chips = pastilles channels */
+.filters {
+  display: flex;
+  gap: 0.45rem;
+  padding: 0 0 0.85rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filters::-webkit-scrollbar { display: none; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 2px solid #c5d8e4;
+  background: #fff;
+  color: var(--wii-muted);
+  border-radius: 999px;
+  padding: 0.32rem 0.5rem 0.32rem 0.8rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px #2a608012;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease, transform 0.15s var(--ease);
+  flex-shrink: 0;
+}
+.chip span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.4rem;
+  padding: 0 0.3rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--wii-blue-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--wii-blue-deep);
+}
+.chip:hover {
+  color: var(--wii-blue-deep);
+  border-color: var(--wii-blue);
+}
+.chip.active {
+  background: linear-gradient(180deg, #6ec4ec, var(--wii-blue));
+  border-color: var(--wii-blue-deep);
+  color: #fff;
+}
+.chip.active span {
+  background: #ffffff44;
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- main */
+
+main { padding: 1.5rem 0 3.5rem; }
+
+/* hero = bandeau style message board Wii */
+.hero {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1.8rem;
+  padding: 1.4rem 1.6rem;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #ffffff 0%, #f2f8fc 100%);
+  border: 2px solid #c5d8e4;
+  box-shadow: 0 4px 0 #b0c8d6, 0 8px 24px #2a608020;
+  position: relative;
+}
+.hero-content { position: relative; z-index: 1; }
+.hero h1 {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.35rem, 3.2vw, 1.75rem);
+  color: var(--wii-blue-deep);
+  letter-spacing: -0.02em;
+}
+.hero p {
+  margin: 0;
+  color: var(--wii-muted);
+  max-width: 42rem;
+  font-size: 0.95rem;
+}
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+.hero-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: var(--wii-blue-soft);
+  border: 1px solid #c5d8e4;
+  font-size: 0.8rem;
+  color: var(--wii-text);
+}
+.hero-stat strong { color: var(--wii-blue-deep); font-weight: 700; }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.1rem;
+}
+.stats {
+  color: var(--wii-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+.stats strong { color: var(--wii-text); font-weight: 700; }
+.pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 0.45rem;
+  border-radius: 50%;
+  background: var(--wii-green);
+  box-shadow: 0 0 0 3px #6cbc4a33;
+  animation: pulse 1.4s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.sort-select {
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: 999px;
+  color: var(--wii-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+  outline: none;
+  box-shadow: 0 2px 5px #2a608012;
+}
+.sort-select:focus {
+  border-color: var(--wii-blue);
+  box-shadow: 0 0 0 3px #3a9fd833;
+}
+
+/* recent */
+.recent { margin-bottom: 1.8rem; }
+.recent-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-bottom: 0.75rem;
+}
+.recent-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--wii-blue-deep);
+}
+.recent-head .count { color: var(--wii-muted); font-size: 0.78rem; }
+.recent-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(140px, 160px);
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.3rem 0.15rem 0.8rem;
+  scrollbar-width: thin;
+  scrollbar-color: #a8c8d8 transparent;
+}
+
+/* shelves = rangées de channels */
+.shelf + .shelf { margin-top: 2rem; }
+.shelf-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  margin-bottom: 0.9rem;
+}
+.shelf-head h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  color: var(--wii-blue-deep);
+}
+.shelf-head .count { color: var(--wii-muted); font-size: 0.8rem; }
+.shelf-head::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, #c5d8e4, transparent);
+  border-radius: 2px;
+  margin-left: 0.4rem;
+}
+
+/* Grille de channels Wii */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--channel-w), 1fr));
+  gap: 1.25rem 1.1rem;
+  padding: 0.25rem 0.1rem 0.5rem;
+}
+
+/* -------------------- channel card (style case Wii) -------------------- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  color: var(--wii-text);
+  transition: transform 0.2s var(--ease);
+  position: relative;
+  text-align: center;
+}
+.card:hover {
+  transform: translateY(-6px) scale(1.03);
+  text-decoration: none;
+  color: var(--wii-text);
+}
+.card:focus-visible {
+  outline: 3px solid var(--wii-blue);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
+/* face de la channel — rectangle arrondi blanc */
+.cover {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: linear-gradient(165deg, #ffffff 0%, #f0f5fa 100%);
+  border-radius: var(--radius);
+  border: 3px solid #e8eef4;
+  box-shadow:
+    0 3px 0 #c0d0dc,
+    0 8px 20px -4px #2a608040,
+    inset 0 1px 0 #ffffff;
+}
+.card:hover .cover {
+  border-color: var(--wii-blue);
+  box-shadow:
+    0 4px 0 #7eb8d0,
+    0 12px 28px -6px #2a608050,
+    inset 0 1px 0 #ffffff;
+}
+
+.cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s var(--ease);
+}
+.card:hover .cover img { transform: scale(1.05); }
+
+/* reflet style Wii en bas de la channel */
+.cover::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -14px;
+  height: 12px;
+  background: radial-gradient(ellipse at center, #2a608028 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.cover .play {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #3a9fd855;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  border-radius: calc(var(--radius) - 3px);
+}
+.card:hover .cover .play { opacity: 1; }
+.cover .play::before {
+  content: "";
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--wii-blue);
+  box-shadow: 0 4px 16px #2a608040;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233a9fd8'%3E%3Cpath d='M8 5.14v14l11-7-11-7z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 55% 50%;
+  background-size: 1.25rem;
+}
+
+.cover.placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(165deg, #eef5fa, #dce8f0);
+}
+.placeholder-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: #8aa0b0;
+  user-select: none;
+}
+.placeholder-inner em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
+.placeholder-inner i {
+  font-style: normal;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #a0b8c8;
+  opacity: 0.7;
+}
+
+.meta {
+  padding: 0.55rem 0.25rem 0.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-height: auto;
+  text-align: center;
+}
+.meta h3 {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 650;
+  line-height: 1.25;
+  color: var(--wii-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.meta p {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--wii-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.region {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: var(--wii-blue-soft);
+  color: var(--wii-blue-deep);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.native-badge {
+  display: inline-block;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: #ffe9c8;
+  color: #8a5a00;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+/* skeleton */
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--channel-w), 1fr));
+  gap: 1.25rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.ghost-card { pointer-events: none; opacity: 0.6; }
+.ghost-card .cover {
+  background: linear-gradient(90deg, #e8f0f6 25%, #f5fafc 50%, #e8f0f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+.ghost-card .meta span {
+  display: block;
+  height: 0.65rem;
+  border-radius: 4px;
+  background: #d8e4ec;
+  margin: 0.3rem auto;
+  width: 80%;
+}
+.ghost-card .meta span:last-child { width: 50%; height: 0.5rem; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* empty */
+.empty {
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  color: var(--wii-muted);
+  background: #ffffff88;
+  border-radius: var(--radius-lg);
+  border: 2px dashed #c5d8e4;
+}
+.empty-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  margin-bottom: 0.6rem;
+  opacity: 0.8;
+}
+.empty h2 { color: var(--wii-blue-deep); margin: 0 0 0.5rem; font-size: 1.2rem; }
+.empty p { max-width: 28rem; margin: 0.4rem auto; font-size: 0.92rem; }
+
+/* footer */
+.foot {
+  padding: 1.4rem 0 2rem;
+  border-top: 2px solid #c5d8e4;
+  color: var(--wii-muted);
+  font-size: 0.82rem;
+  background: linear-gradient(180deg, transparent, #ffffff55);
+}
+.foot-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.foot a { color: var(--wii-blue-deep); }
+.foot a:hover { color: var(--wii-blue); }
+.foot p { margin: 0; }
+
+/* ---------------------------------------------------------------- player */
+
+.player-top {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0;
+  min-height: var(--header-h);
+}
+.player-top h1 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  max-width: min(360px, 40vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--wii-blue-deep);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #c5d8e4;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--wii-muted);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px #2a608012;
+}
+.pill.good {
+  background: #e8f8e0;
+  border-color: #a0d080;
+  color: #3a8020;
+}
+.pill.warn {
+  background: #fff5e0;
+  border-color: #e8c070;
+  color: #a07020;
+}
+
+.cover-thumb {
+  width: 2.2rem;
+  height: 2.9rem;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid #c5d8e4;
+  background: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px #2a608020;
+}
+
+#ejs {
+  width: 100%;
+  min-height: 360px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #0a0c12;
+  border: 3px solid #c5d8e4;
+  box-shadow: 0 4px 0 #b0c8d6, 0 12px 32px #2a608030;
+  position: relative;
+}
+#ejs:fullscreen,
+#ejs:-webkit-full-screen {
+  border-radius: 0;
+  border: 0;
+  min-height: 100vh;
+}
+
+.player-shell { position: relative; }
+
+.player-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: #0a0c12;
+  border-radius: calc(var(--radius) - 2px);
+  color: #a0b0c0;
+  font-size: 0.92rem;
+}
+.player-loading[hidden] { display: none; }
+.loader-ring {
+  width: 42px;
+  height: 42px;
+  border: 3px solid #3a5060;
+  border-top-color: var(--wii-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.player-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+  align-items: center;
+}
+
+.hint {
+  margin: 1rem 0 0;
+  font-size: 0.84rem;
+  color: var(--wii-muted);
+  line-height: 1.5;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  background: #fff8e8;
+  border: 2px solid #e8d0a0;
+  border-radius: 14px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.88rem;
+  color: #6a5020;
+}
+.notice .btn { padding: 0.32rem 0.7rem; font-size: 0.8rem; }
+
+.crash {
+  background: #fef0f0;
+  border: 2px solid #e8b0b0;
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+}
+.crash strong { color: #c04040; }
+.crash p { margin: 0.45rem 0 0; font-size: 0.86rem; }
+.crash-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.9rem; }
+
+.native-only {
+  background: #eef6fb;
+  border: 2px solid #a8cde0;
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  margin-top: 1rem;
+}
+.native-only strong { color: var(--wii-blue-deep); }
+.native-only p { margin: 0.45rem 0 0; font-size: 0.86rem; }
+
+#netplay-link.active {
+  border-color: var(--wii-green);
+  color: #3a8020;
+}
+
+.diag {
+  margin-top: 1.2rem;
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1rem;
+  font-size: 0.84rem;
+  box-shadow: 0 2px 8px #2a608012;
+}
+.diag summary {
+  cursor: pointer;
+  color: var(--wii-muted);
+  font-weight: 650;
+  user-select: none;
+}
+.diag summary:hover { color: var(--wii-blue-deep); }
+.diag ul { margin: 0.75rem 0 0; padding-left: 1.1rem; color: var(--wii-muted); }
+.diag li { margin-bottom: 0.3rem; }
+.diag li strong { color: var(--wii-text); }
+.diag .hint { margin: 0.55rem 0 0; line-height: 1.5; }
+
+.status {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  background: #fef0f0;
+  border: 2px solid #e8b0b0;
+  border-radius: 12px;
+  color: #c04040;
+  font-size: 0.9rem;
+}
+
+.pad-panel {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  box-shadow: 0 2px 8px #2a608012;
+}
+.pad-panel strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  color: var(--wii-blue-deep);
+}
+.pad-panel p { margin: 0; line-height: 1.5; color: var(--wii-muted); }
+.pad-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--wii-text);
+}
+.pad-list li { margin-bottom: 0.25rem; }
+.pad-list li.warn-item { color: var(--wii-orange); }
+
+.netplay-help {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem;
+  background: linear-gradient(180deg, #fff 0%, var(--wii-blue-soft) 100%);
+  border: 2px solid #c5d8e4;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  box-shadow: 0 2px 8px #2a608012;
+}
+.netplay-help strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--wii-blue-deep);
+  font-size: 0.95rem;
+}
+.netplay-help ol {
+  margin: 0.4rem 0 0.7rem;
+  padding-left: 1.3rem;
+  color: var(--wii-text);
+  line-height: 1.55;
+}
+.netplay-help li { margin-bottom: 0.25rem; }
+.netplay-help .muted { margin: 0; font-size: 0.82rem; }
+
+/* ------------------------------------------------------------- forms */
+
+.panel {
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  margin-bottom: 1.2rem;
+  box-shadow: 0 3px 0 #c0d0dc, 0 8px 20px #2a608018;
+}
+.panel h2 { margin: 0 0 0.4rem; font-size: 1.15rem; color: var(--wii-blue-deep); }
+.panel > .muted { margin: 0 0 1.2rem; font-size: 0.9rem; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.field label { font-size: 0.86rem; color: var(--wii-muted); font-weight: 600; }
+.field input,
+.field select {
+  background: #fff;
+  border: 2px solid #c5d8e4;
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  color: var(--wii-text);
+  font-size: 0.94rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--wii-blue);
+  box-shadow: 0 0 0 3px #3a9fd833;
+}
+
+.progress {
+  height: 10px;
+  background: #e0eaf0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 0.9rem;
+  border: 1px solid #c5d8e4;
+}
+.progress > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--wii-blue), var(--wii-accent));
+  transition: width 0.15s ease;
+  border-radius: inherit;
+}
+.msg { margin-top: 0.8rem; font-size: 0.9rem; min-height: 1.2em; }
+.msg.ok { color: #3a8020; }
+.msg.err { color: #c04040; }
+
+.licenses {
+  max-width: 48rem;
+  margin: 0 auto;
+  line-height: 1.65;
+  background: #ffffffcc;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 2px solid #c5d8e4;
+}
+.licenses h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--wii-blue-deep); }
+.licenses h2 { font-size: 1.1rem; margin-top: 1.8rem; margin-bottom: 0.4rem; color: var(--wii-blue-deep); }
+.licenses p { color: var(--wii-muted); }
+
+/* ------------------------------------------------------------- responsive */
+
+@media (max-width: 720px) {
+  .brand-text small { display: none; }
+  .search input { width: 36vw; }
+  .search kbd { display: none; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem 0.8rem; }
+  .skeleton-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem 0.8rem; }
+  .player-top h1 { max-width: 100%; font-size: 0.92rem; }
+  .hero { padding: 1.15rem 1rem; box-shadow: 0 3px 0 #b0c8d6, 0 6px 16px #2a608018; }
+  .meta h3 { font-size: 0.8rem; }
+  #ejs { min-height: 280px; }
+  .foot-row { flex-direction: column; gap: 0.4rem; }
+}
+
+@media (max-width: 420px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+  .tools .btn.ghost { padding: 0.4rem 0.7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .card:hover { transform: none; }
+  .card:hover .cover img { transform: none; }
+}
+
+/* Bandeau de secours : liens kirbyretro:// non ouverts (launcher absent, Firefox…) */
+.flash-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 780px);
+  padding: 12px 14px;
+  background: #14313f;
+  color: #eaf6fb;
+  border-radius: 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+  z-index: 9999;
+  animation: flash-in 0.25s ease-out;
+}
+.flash-toast .flash-text {
+  flex: 1 1 220px;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+.flash-toast .flash-text strong { color: #fff; }
+.flash-toast .flash-close {
+  border: 0;
+  background: transparent;
+  color: #9fc4d4;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 5px 7px;
+  border-radius: 8px;
+}
+.flash-toast .flash-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+@keyframes flash-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

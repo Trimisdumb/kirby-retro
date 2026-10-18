@@ -1,0 +1,15 @@
+{
+  "name": "retro-site",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bibliothèque rétro + émulateurs WASM auto-hébergés (EmulatorJS) pour retro.kirbytrim.buzz",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "fetch-ejs": "bash scripts/fetch-ejs.sh"
+  }
+}

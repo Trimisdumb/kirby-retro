@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Client PC (launcher) — Retro</title>
+  <meta name="description" content="Télécharge Kirby Retro Launcher : joue à tes jeux DS, N64, PSX… en natif sur Windows et Linux (RetroArch, melonDS, DuckStation).">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7ec8e8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/favicon-192.png">
+  <link rel="stylesheet" href="/style.css?v=20261018b">
+  <style>
+    /* Styles spécifiques à la page client */
+    .dl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .dl-card {
+      background: #f4fbff; border: 2px dashed #c5d8e4; border-radius: 14px;
+      padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.55rem;
+    }
+    .dl-card strong { font-size: 1.04rem; color: var(--wii-blue-deep); }
+    .dl-card p { margin: 0; font-size: 0.88rem; color: var(--wii-muted); }
+    .dl-card .btn { align-self: flex-start; margin-top: auto; }
+    .dl-card.os-yours { border-style: solid; border-color: var(--wii-blue); background: #eaf7ff; box-shadow: 0 3px 0 #c0d0dc, 0 8px 20px #2a608018; }
+    .badge {
+      display: inline-block; background: var(--wii-blue); color: #fff; font-size: 0.72rem;
+      font-weight: 700; border-radius: 999px; padding: 0.12rem 0.6rem; margin-left: 0.4rem;
+      vertical-align: middle;
+    }
+    .steps ol { margin: 0.6rem 0 0; padding-left: 1.4rem; line-height: 1.75; }
+    .steps li { margin-bottom: 0.55rem; }
+    .steps code, .inline-code {
+      background: #eef6fb; border: 1px solid #cfe2ee; border-radius: 6px;
+      padding: 0.08rem 0.38rem; font-size: 0.87em; white-space: nowrap;
+    }
+    .steps pre {
+      background: #0f2233; color: #d8ecf7; padding: 0.75rem 1rem; border-radius: 10px;
+      overflow: auto; font-size: 0.84rem; line-height: 1.55; margin: 0.5rem 0 0.7rem;
+    }
+    .steps pre code { background: none; border: none; padding: 0; white-space: pre; }
+    details.faq { border-top: 1px solid #e2edf4; padding: 0.65rem 0; }
+    details.faq:first-of-type { border-top: none; }
+    details.faq summary { cursor: pointer; font-weight: 600; color: var(--wii-blue-deep); }
+    details.faq p, details.faq ul { margin: 0.5rem 0 0.2rem; color: var(--wii-muted); line-height: 1.65; }
+    .core-table { border-collapse: collapse; margin-top: 0.6rem; font-size: 0.88rem; }
+    .core-table th, .core-table td { border: 1px solid #d9e7f0; padding: 0.35rem 0.7rem; text-align: left; }
+    .core-table th { background: #eef6fb; color: var(--wii-blue-deep); }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap bar">
+      <a class="brand" href="/">
+        <img class="logo-img" src="/favicon.png" alt="">
+        <span class="brand-text"><strong>Retro</strong><small>Client PC (launcher)</small></span>
+      </a>
+      <a class="btn ghost" href="/">← Bibliothèque</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <h2>🖥 Kirby Retro Launcher</h2>
+      <p class="muted">
+        Le navigateur suffit pour la plupart des consoles — mais la <strong>DS</strong>, la <strong>N64</strong> et
+        la <strong>PSX</strong> sont bien plus fluides avec un émulateur natif. Ce petit client
+        (Python + Tkinter) reprend la bibliothèque du site et lance chaque jeu dans
+        <a href="https://www.retroarch.com/" target="_blank" rel="noreferrer">RetroArch</a> ou un émulateur
+        standalone (melonDS, DuckStation…). Les ROMs absentes se téléchargent automatiquement depuis le site.
+      </p>
+      <p class="hint" style="margin-top:-2px">
+        <strong>Nouveau en 1.6.0 :</strong> bouton <strong>SAUVEGARDES</strong> — retrouve les sauvegardes d'un jeu
+        et importe-les entre émulateur natif et RetroArch (conversion DS, fusion N64 au passage, copie de
+        secours <code class="inline-code">.bak</code> automatique : rien n'est écrasé).
+        <br><small>(1.5.0 : habillage rétro-arcade — jaquettes, polices pixel, chiptune, recherche + filtres.)</small>
+      </p>
+      <div class="dl-grid">
+        <div class="dl-card" id="dl-win">
+          <strong>🪟 Windows 10 / 11</strong>
+          <p>Archive ZIP — extrais, puis double-clic sur <code class="inline-code">run.bat</code>.</p>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.6.0.zip" download>⬇ Télécharger le client (.zip)</a>
+        </div>
+        <div class="dl-card" id="dl-linux">
+          <strong>🐧 Linux</strong>
+          <p>Archive tar.gz — extrais, puis <code class="inline-code">./run.sh</code>.</p>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.6.0.tar.gz" download>⬇ Télécharger le client (.tar.gz)</a>
+        </div>
+      </div>
+      <p class="hint">
+        Même code pour les deux systèmes. Prérequis : <strong>Python 3.10+</strong> et <strong>RetroArch + cores</strong>
+        (gratuits). Aucune dépendance Python à installer, rien à compiler. Sous Linux, installe aussi tkinter
+        (<code class="inline-code">sudo dnf install python3-tkinter</code> ou
+        <code class="inline-code">sudo apt install python3-tk</code>) pour l'interface.
+      </p>
+    </section>
+
+    <section class="panel steps" id="steps-win">
+      <h2>🪟 Installation — Windows</h2>
+      <ol>
+        <li>
+          <strong>Installe Python</strong> — <a href="https://www.python.org/downloads/windows/" target="_blank" rel="noreferrer">python.org/downloads/windows</a>
+          (version 3.10 ou plus récente). Pendant l'installation, coche bien
+          <strong>« Add python.exe to PATH »</strong>.
+        </li>
+        <li>
+          <strong>Installe RetroArch</strong> — <a href="https://www.retroarch.com/" target="_blank" rel="noreferrer">retroarch.com</a>
+          → Download (Windows 64-bit). Lance RetroArch une fois, puis
+          <em>Online Updater → Manage Cores</em> et installe les cores de tes consoles
+          (voir la liste plus bas : melonDS DS pour la DS, Mupen64Plus-Next pour la N64…).
+        </li>
+        <li>
+          <strong>Télécharge le client</strong> (bouton .zip ci-dessus), puis clic droit sur le fichier →
+          <em>Extraire tout…</em> (n'importe où, ex. <code class="inline-code">Documents\kirby-retro-launcher</code>).
+        </li>
+        <li>
+          <strong>Lance-le</strong> — double-clic sur <code class="inline-code">run.bat</code>. La fenêtre s'ouvre,
+          la bibliothèque se charge et RetroArch est détecté automatiquement.
+        </li>
+        <li>
+          <strong>(Recommandé) Associe les liens du site</strong> — dans le launcher :
+          <em>Paramètres → « Associer les liens kirbyretro:// »</em>.
+          Ensuite, le bouton <strong>« Launcher natif »</strong> du site ouvre directement le jeu,
+          sans passer par une fenêtre de choix.
+        </li>
+        <li>
+          <strong>Joue</strong> — double-clic sur un jeu : la ROM se télécharge dans
+          <code class="inline-code">%USERPROFILE%\KirbyRetroROMs</code> (modifiable dans Paramètres)
+          et l'émulateur se lance.
+        </li>
+      </ol>
+    </section>
+
+    <section class="panel steps" id="steps-linux">
+      <h2>🐧 Installation — Linux</h2>
+      <ol>
+        <li>
+          <strong>Python 3.10+</strong> — déjà présent sur la plupart des distributions
+          (<code class="inline-code">python3 --version</code> pour vérifier).
+        </li>
+        <li>
+          <strong>Installe RetroArch</strong> selon ta distribution :
+          <pre><code># Fedora / Nobara
+sudo dnf install retroarch
+
+# Debian / Ubuntu / Mint
+sudo apt install retroarch
+
+# Ou en Flatpak (détecté aussi)
+flatpak install flathub org.libretro.RetroArch</code></pre>
+          Puis, dans RetroArch : <em>Online Updater → Manage Cores</em> (ou installe les paquets
+          <code class="inline-code">libretro-*</code> de ta distribution).
+        </li>
+        <li>
+          <strong>Télécharge et extrais le client</strong> :
+          <pre><code>tar -xzf kirby-retro-launcher-1.6.0.tar.gz
+cd kirby-retro-launcher</code></pre>
+        </li>
+        <li>
+          <strong>Lance-le</strong> :
+          <pre><code>./run.sh</code></pre>
+          La bibliothèque se charge, RetroArch et les cores sont détectés automatiquement :
+          paquet système (dnf/apt/pacman), Flatpak, snap, portable — cores cherchés dans
+          <code class="inline-code">~/.config/retroarch/cores</code>, <code class="inline-code">/usr/lib*/libretro</code>,
+          le dossier Flatpak, et celui déclaré dans <code class="inline-code">retroarch.cfg</code>.
+        </li>
+        <li>
+          <strong>(Recommandé) Associe les liens du site</strong> :
+          <pre><code>./run.sh install-protocol</code></pre>
+          Aucun droit root nécessaire. Tu peux aussi le faire via
+          <em>Paramètres → « Associer les liens kirbyretro:// »</em>.
+        </li>
+        <li>
+          <strong>Joue</strong> — double-clic sur un jeu : la ROM se télécharge dans
+          <code class="inline-code">~/KirbyRetroROMs</code> et l'émulateur se lance.
+        </li>
+      </ol>
+    </section>
+
+    <section class="panel">
+      <h2>🎮 Cores conseillés (RetroArch)</h2>
+      <p class="muted">
+        Le launcher te dit exactement ce qui manque : <code class="inline-code">run.sh doctor</code> /
+        <code class="inline-code">run.bat doctor</code>, ou <em>Paramètres → Diagnostic</em>.
+      </p>
+      <table class="core-table">
+        <tr><th>Console</th><th>Core (Online Updater → Manage Cores)</th></tr>
+        <tr><td>NES</td><td>FCEUmm</td></tr>
+        <tr><td>SNES</td><td>Snes9x</td></tr>
+        <tr><td>Game Boy / GBA</td><td>Gambatte / mGBA</td></tr>
+        <tr><td>Mega Drive</td><td>Genesis Plus GX</td></tr>
+        <tr><td><strong>Nintendo DS</strong></td><td><strong>melonDS DS</strong> (ou DeSmuME)</td></tr>
+        <tr><td><strong>Nintendo 64</strong></td><td><strong>Mupen64Plus-Next</strong></td></tr>
+        <tr><td><strong>PlayStation</strong></td><td><strong>PCSX-ReARMed</strong> (ou DuckStation en natif)</td></tr>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>❓ Problèmes fréquents</h2>
+
+      <details class="faq">
+        <summary>Sur Windows, la fenêtre <code class="inline-code">run.bat</code> se ferme aussitôt</summary>
+        <p>
+          C'est que Python n'est pas dans le PATH. Réinstalle Python depuis python.org en cochant
+          <strong>« Add python.exe to PATH »</strong>, puis relance <code class="inline-code">run.bat</code>.
+          Le script essaie automatiquement <code class="inline-code">python</code> puis le lanceur
+          <code class="inline-code">py</code>.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>« Aucun core RetroArch pour cette console »</summary>
+        <p>
+          Ouvre RetroArch → <em>Online Updater → Manage Cores</em> et installe le core indiqué dans le message
+          (voir le tableau ci-dessus). Relance ensuite <em>Paramètres → Diagnostic</em> pour vérifier.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Le bouton « Launcher natif » du site ne fait rien (ou seulement dans Firefox)</summary>
+        <p>
+          Le navigateur ne sait pas encore quel programme ouvrir pour les liens
+          <code class="inline-code">kirbyretro://</code>. Fais une fois l'étape 5 de l'installation
+          (<code class="inline-code">install-protocol</code>), et c'est réglé.
+        </p>
+        <p>
+          <strong>Firefox</strong> : il demande l'autorisation la première fois puis mémorise le choix. Si rien ne
+          s'ouvre : <em>Paramètres → Général → Applications</em>, cherche <code class="inline-code">kirbyretro</code>,
+          choisis « Toujours demander », puis <strong>redémarre Firefox</strong> (il relit les associations système
+          au démarrage, contrairement à Chrome). En dernier recours : <code class="inline-code">about:config</code>
+          → supprime les clés <code class="inline-code">network.protocol-handler.*.kirbyretro</code>.
+        </p>
+        <p>
+          Si le launcher ne s'ouvre toujours pas, un <strong>bandeau de secours</strong> s'affiche en bas de la page
+          avec un bouton <strong>« Jouer dans le navigateur »</strong> — tu ne restes jamais bloqué.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Sur Linux : « Aucun émulateur configuré » ou « core introuvable »</summary>
+        <p>
+          Mets à jour le launcher en <strong>1.6.0</strong> : il détecte RetroArch installé par
+          <code class="inline-code">dnf</code>, <code class="inline-code">apt</code>, <code class="inline-code">pacman</code>,
+          Flatpak, snap ou en archive, et cherche les cores dans <code class="inline-code">~/.config/retroarch/cores</code>,
+          <code class="inline-code">/usr/lib*/libretro</code> et le dossier déclaré dans
+          <code class="inline-code">retroarch.cfg</code>.
+        </p>
+        <p>
+          Vérifie ensuite avec <code class="inline-code">./run.sh doctor</code> : il affiche les dossiers de cores
+          explorés et les cores trouvés console par console. Il manque un core ? Dans RetroArch :
+          <em>Online Updater → Manage Cores</em>, installe-le, relance le doctor.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Dans le navigateur, la DS affiche un écran noir ou reste bloquée (parfois)</summary>
+        <p>
+          La DS en WASM est exigeante. Essaie, dans l'ordre : mode <strong>⚡ performance</strong> (multi-thread),
+          <strong>⚙️ Frame Skip 1–2</strong>, désactive les shaders, ou passe en <strong>mode compatibilité</strong>.
+          Recharge aussi la page (Ctrl+Shift+R) après une mise à jour du site — et vide le cache de l'émulateur
+          si un jeu reste entêté.
+        </p>
+        <p>
+          Pour la DS, le plus simple reste le <strong>launcher natif</strong> (RetroArch / melonDS) : c'est
+          beaucoup plus rapide et stable. En cas de doute, le bouton « 🖥 Launcher natif » de la page du jeu
+          fait le nécessaire.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Certains jeux (Saturn, Dreamcast, GameCube…) ne s'ouvrent pas dans le navigateur</summary>
+        <p>
+          Ces consoles n'ont pas d'émulateur navigateur : elles se lancent uniquement via le
+          <strong>launcher natif</strong> (RetroArch + le core correspondant ; BIOS nécessaire pour la Saturn).
+          Sur la bibliothèque, leurs jeux affichent un badge <strong>🖥 launcher</strong> et le clic ouvre
+          directement le launcher. Installe aussi le core dans RetroArch : <em>Online Updater → Manage Cores</em>.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Comment jouer en ligne avec un ami ? (netplay)</summary>
+        <p>
+          Mets à jour le launcher en <strong>1.6.0</strong> chez vous deux, puis :
+        </p>
+        <ol>
+          <li>L'un de vous sélectionne le jeu et clique <strong>🌐 En ligne → Héberger</strong>.</li>
+          <li>Il clique <strong>📋 Copier</strong> et envoie l'adresse affichée (Tailscale / réseau local) à l'autre.</li>
+          <li>L'autre clique <strong>🌐 En ligne → Rejoindre</strong>, colle l'adresse et lance la partie.</li>
+        </ol>
+        <p>
+          Astuce : la case <strong>relais RetroArch</strong> (côté hôte) évite d'ouvrir un port — l'ami rejoint
+          alors via <em>RetroArch → Netplay</em> (actualise et cherche le pseudo de l'hôte, mot de passe optionnel).
+          Idéal sur NES, SNES, Mega Drive, GBA, PSX ; variable sur N64 ; pas disponible pour DS / Wii / PSP.
+          Il faut le même jeu chez les deux — le launcher télécharge les ROMs tout seul.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Où sont mes ROMs et ma configuration ?</summary>
+        <ul>
+          <li>ROMs : <code class="inline-code">~/KirbyRetroROMs</code> (dossier par console) — modifiable dans Paramètres ;</li>
+          <li>Config : <code class="inline-code">~/.config/KirbyRetroLauncher/config.json</code>
+              (<code class="inline-code">%APPDATA%\KirbyRetroLauncher</code> sur Windows) ;</li>
+          <li>Le launcher ne modifie rien chez toi sans action : il télécharge une ROM seulement quand tu cliques sur un jeu.</li>
+        </ul>
+      </details>
+
+      <details class="faq">
+        <summary>Je préfère melonDS / DuckStation à RetroArch</summary>
+        <p>
+          Le launcher les détecte automatiquement s'ils sont dans le PATH (et RetroArch reste le repli).
+          Sur Linux, les paquets <code class="inline-code">melonds</code> et
+          <code class="inline-code">duckstation-qt</code> suffisent.
+        </p>
+      </details>
+
+      <details class="faq">
+        <summary>Et macOS ?</summary>
+        <p>
+          Le code est compatible, mais l'association du protocole n'est pas automatisée.
+          Dans le README de l'archive, une section explique la petite manip Automator. Sinon,
+          le mode navigateur reste disponible pour toutes les consoles légères.
+        </p>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h2>🔒 À propos des jeux</h2>
+      <p class="muted" style="margin:0">
+        Ce client ne fournit aucun jeu : il lit la bibliothèque de ton propre serveur
+        (tes sauvegardes personnelles et homebrews). Les marques et jeux cités appartiennent
+        à leurs éditeurs respectifs — voir <a href="/licenses.html">licences &amp; crédits</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <div class="foot-row">
+      <p><a href="/">← Retour à la bibliothèque</a> · <a href="/upload.html">Ajouter une ROM</a> · <a href="/licenses.html">licences</a></p>
+      <p class="muted">Kirby Retro Launcher v1.6.0</p>
+    </div>
+  </footer>
+
+  <script>
+    // Met en avant le téléchargement correspondant à l'OS du visiteur
+    (function () {
+      const ua = navigator.userAgent || "";
+      const isWin = /Windows/i.test(ua);
+      const isLinux = /Linux/i.test(ua) && !/Android/i.test(ua);
+      const win = document.getElementById("dl-win");
+      const lin = document.getElementById("dl-linux");
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = "recommandé pour toi";
+      if (isWin && win) { win.classList.add("os-yours"); win.querySelector("strong").append(badge); }
+      else if (isLinux && lin) { lin.classList.add("os-yours"); lin.querySelector("strong").append(badge); }
+    })();
+  </script>
+</body>
+</html>

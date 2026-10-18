@@ -1,0 +1,28 @@
+# Cores EmulatorJS rapatriés en local par scripts/fetch-ejs.sh
+# Variante mono-thread (-wasm.data) : aucun en-tête COOP/COEP requis, donc compatible Cloudflare tel quel.
+# Ajoute/retire une ligne puis relance le script pour mettre à jour.
+fceumm           # nes
+nestopia         # nes (alternatif du menu EJS)
+snes9x           # snes
+gambatte         # gb / gbc
+mgba             # gba
+melonds          # nds
+desmume          # nds (alternatif : réglage navigateur existant / mode compat)
+desmume2015      # nds (alternatif du menu EJS)
+mupen64plus_next # n64
+parallel_n64     # n64 (alternatif du menu EJS)
+pcsx_rearmed     # psx
+mednafen_psx_hw  # psx (alternatif du menu EJS)
+genesis_plus_gx  # segaMD / segaGG / segaCD
+smsplus          # segaMS
+picodrive        # segaMD / segaCD / segaMS / sega32x (alternatif du menu EJS)
+mednafen_pce     # pce
+stella2014       # atari2600
+handy            # lynx
+vice_x64sc       # c64
+beetle_vb        # vb
+# --- consoles v1.3.0 ---
+fbneo            # arcade (FBNeo)
+fbalpha2012_cps1 # arcade (alternatif CPS1 du menu EJS)
+fbalpha2012_cps2 # arcade (alternatif CPS2 du menu EJS)
+ppsspp           # psp (uniquement -thread : le core exige le multi-thread)

@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chargement… — Retro</title>
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#7ec8e8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="apple-touch-icon" href="/favicon-192.png">
+  <link rel="stylesheet" href="/style.css?v=20261018b">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap player-top">
+      <a class="brand-mini" href="/" title="Bibliothèque"><img src="/favicon.png" alt="Retro"></a>
+      <a class="btn ghost sm" href="/">← Bibliothèque</a>
+      <img id="cover" class="cover-thumb" alt="" hidden>
+      <h1 id="game-title">Chargement…</h1>
+      <span class="pill" id="game-system"></span>
+      <span class="pill" id="game-mode"></span>
+      <span class="pill" id="pad-pill" hidden></span>
+      <button class="btn ghost sm" id="mode-link" type="button" hidden></button>
+      <a class="btn ghost sm" id="netplay-link" href="#" hidden></a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="notice" id="notice" hidden></div>
+
+    <div class="player-shell">
+      <div class="player-loading" id="loading">
+        <div class="loader-ring" aria-hidden="true"></div>
+        <span id="loading-text">Préparation de l'émulateur…</span>
+      </div>
+      <div id="ejs" tabindex="0"></div>
+    </div>
+
+    <div class="player-toolbar" id="toolbar" hidden>
+      <a class="btn sm" id="btn-launcher" href="#">🖥 Ouvrir dans le launcher</a>
+      <button class="btn ghost sm" type="button" id="btn-fullscreen">⛶ Plein écran</button>
+      <button class="btn ghost sm" type="button" id="btn-reload">↻ Recharger</button>
+      <button class="btn ghost sm" type="button" id="btn-reset" title="Vide le cache des jeux/cores et remet les réglages de l'émulateur à zéro — tes sauvegardes sont conservées">🧹 Cache &amp; réglages</button>
+      <button class="btn ghost sm" type="button" id="btn-focus" title="Clique ici puis appuie sur un bouton de la manette">🎮 Activer manette</button>
+    </div>
+
+    <div class="pad-panel" id="pad-panel">
+      <strong>Manette</strong>
+      <p id="pad-status" class="muted">Branche ta manette (Xbox USB/Bluetooth), clique <strong>Activer manette</strong>, puis appuie sur <strong>A</strong>. Sous Linux : utilise Chrome/Edge si possible ; le mapping se fait dans ⚙️ → Control Settings → sélectionne la manette dans « Connected Gamepad ».</p>
+      <ul id="pad-list" class="pad-list" hidden></ul>
+    </div>
+
+    <div class="crash" id="crash" hidden>
+      <strong id="crash-title">L'émulateur s'est arrêté</strong>
+      <p id="crash-detail" class="muted"></p>
+      <div class="crash-actions">
+        <button class="btn" id="crash-compat" type="button">🛡️ Mode compatibilité</button>
+        <button class="btn ghost" id="crash-reset" type="button">🧹 Vider cache &amp; réglages</button>
+        <button class="btn ghost" id="crash-reload" type="button">↻ Recharger</button>
+      </div>
+    </div>
+
+    <div class="native-only" id="native-only" hidden>
+      <strong>🖥 Launcher natif requis</strong>
+      <p class="muted" id="native-only-text"></p>
+      <div class="crash-actions">
+        <a class="btn" id="native-only-btn" href="#">🖥 Ouvrir dans le launcher</a>
+        <a class="btn ghost" href="/client.html">⬇ Installer le launcher</a>
+      </div>
+    </div>
+
+    <div class="netplay-help" id="netplay-help" hidden>
+      <strong>Netplay — jouer à deux</strong>
+      <ol>
+        <li>Les <strong>deux joueurs</strong> ouvrent <em>exactement le même jeu</em> (même console + même fichier).</li>
+        <li>Cliquez l’icône <strong>🌐</strong> dans la barre de l’émulateur (en bas).</li>
+        <li><strong>Hôte</strong> : crée une salle (nom + mot de passe optionnel).</li>
+        <li><strong>Invité</strong> : rafraîchit la liste et rejoint la salle.</li>
+        <li>Manette Xbox : appuie sur <strong>A</strong> sur cette page, puis mappe dans ⚙️ → Contrôles si besoin.</li>
+      </ol>
+      <p class="muted">Astuce test 2 PC : même Wi‑Fi = plus stable. Hors LAN, le TURN est utilisé automatiquement. DS/N64 : l’hôte doit avoir une machine correcte (le flux vidéo part de l’hôte).</p>
+    </div>
+
+    <p class="hint" id="hint">
+      Clavier : flèches + X/Z/S/A · Entrée = Start · Maj = Select.
+      Manette : menu ⚙️ → Contrôles pour mapper les boutons.
+      DS / N64 / PSP : si ça rame, active le frame skip dans ⚙️ ou passe en mode compatibilité.
+    </p>
+
+    <details class="diag">
+      <summary>Diagnostic</summary>
+      <ul id="diag-list"></ul>
+      <div id="diag-tips"></div>
+    </details>
+
+    <p class="status" id="status" hidden></p>
+  </main>
+
+  <footer class="wrap foot">
+    <p><a href="https://github.com/EmulatorJS/EmulatorJS" target="_blank" rel="noreferrer">EmulatorJS</a> · <a href="/licenses.html">licences</a></p>
+  </footer>
+
+  <script type="module">
+    const params = new URLSearchParams(location.search);
+    const systemId = params.get("system") || "";
+    const fileName = params.get("file") || "";
+    const netplayRequested = params.get("netplay") === "1";
+    const status = document.getElementById("status");
+    const titleEl = document.getElementById("game-title");
+    const notice = document.getElementById("notice");
+    const loading = document.getElementById("loading");
+    const loadingText = document.getElementById("loading-text");
+    const toolbar = document.getElementById("toolbar");
+    const padPill = document.getElementById("pad-pill");
+    const padStatus = document.getElementById("pad-status");
+    const padList = document.getElementById("pad-list");
+
+    const RECENT_KEY = "retro-recent";
+    const RECENT_MAX = 12;
+    const HEAVY = new Set(["nds", "n64", "psx", "psp", "segaSaturn", "dreamcast"]);
+
+    const fail = (message) => {
+      status.hidden = false;
+      status.textContent = message;
+      loading.hidden = true;
+    };
+
+    /* Bandeau de secours si le lien kirbyretro:// ne s'ouvre pas (launcher absent, Firefox…) */
+    function showLauncherToastHelp() {
+      document.querySelector(".flash-toast")?.remove();
+      const toast = document.createElement("div");
+      toast.className = "flash-toast";
+      toast.setAttribute("role", "status");
+      const text = document.createElement("span");
+      text.className = "flash-text";
+      text.textContent = "Le launcher ne s'ouvre pas ? Il doit être installé sur ce PC.";
+      const install = document.createElement("a");
+      install.className = "btn sm";
+      install.href = "/client.html";
+      install.textContent = "⬇ Installer le launcher";
+      const stay = document.createElement("a");
+      stay.className = "btn ghost sm";
+      stay.href = "#";
+      stay.textContent = "▶ Rester dans le navigateur";
+      stay.addEventListener("click", (e) => {
+        e.preventDefault();
+        toast.remove();
+      });
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "flash-close";
+      close.setAttribute("aria-label", "Fermer");
+      close.textContent = "✕";
+      close.addEventListener("click", () => toast.remove());
+      toast.append(text, install, stay, close);
+      document.body.append(toast);
+      window.clearTimeout(showLauncherToastHelp._timer);
+      showLauncherToastHelp._timer = window.setTimeout(() => toast.remove(), 15000);
+    }
+
+    /* Console sans émulateur navigateur (core vide dans le catalogue) :
+       on affiche un panneau qui renvoie vers le launcher natif. */
+    function showNativeOnly(system, game) {
+      loading.hidden = true;
+      status.hidden = true;
+      const box = document.getElementById("native-only");
+      box.hidden = false;
+      document.getElementById("native-only-text").textContent =
+        `${game.title} (${system.label}) se lance avec le launcher natif (RetroArch) : `
+        + "cette console n'a pas d'émulateur dans le navigateur.";
+      const btn = document.getElementById("native-only-btn");
+      btn.href = `kirbyretro://play?system=${encodeURIComponent(system.id)}&file=${encodeURIComponent(game.file)}`;
+      btn.addEventListener("click", () => window.setTimeout(() => showLauncherToastHelp(), 1400));
+    }
+
+    const setLoading = (text) => {
+      loading.hidden = false;
+      loadingText.textContent = text;
+    };
+
+    const storageOk = (() => {
+      try {
+        localStorage.setItem("retro-probe", "1");
+        localStorage.removeItem("retro-probe");
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+
+    const storedMode = (() => {
+      try { return localStorage.getItem("retro-mode"); } catch { return null; }
+    })();
+
+    const isGecko = /firefox|waterfox|librewolf|iceweasel|palemoon|basilisk/i.test(navigator.userAgent);
+
+    const mode = params.get("safe") === "1" ? "compat"
+      : params.get("perf") === "1" ? "perf"
+        : storedMode === "compat" || storedMode === "perf" ? storedMode
+          : isGecko ? "compat" : "perf";
+
+    const threadsAvailable = typeof SharedArrayBuffer !== "undefined" && self.crossOriginIsolated === true;
+
+    function webglInfo() {
+      const canvas = document.createElement("canvas");
+      const gl2 = canvas.getContext("webgl2", { powerPreference: "high-performance", antialias: false });
+      const gl = gl2 || canvas.getContext("webgl", { powerPreference: "high-performance", antialias: false });
+      if (!gl) return { label: "indisponible", renderer: "", software: false, webgl2: false };
+      const info = gl.getExtension("WEBGL_debug_renderer_info");
+      const renderer = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL) || "") : "";
+      return {
+        label: gl2 ? "WebGL2" : "WebGL1",
+        renderer: renderer || "masqué",
+        software: /swiftshader|llvmpipe|softpipe|microsoft basic render/i.test(renderer),
+        webgl2: Boolean(gl2),
+      };
+    }
+
+    const gl = webglInfo();
+    // Multi-thread uniquement en mode perf (forcer les threads sur DS en compat cassait melonDS)
+    const useThreads = mode === "perf" && threadsAvailable;
+
+    function numericId(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i += 1) hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+      return Math.abs(hash) || 1;
+    }
+
+    function formatSize(bytes) {
+      if (!bytes) return "";
+      const units = ["o", "Ko", "Mo", "Go"];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
+      return `${unit === 0 || value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+    }
+
+    function pushRecent(game) {
+      if (!storageOk) return;
+      try {
+        const key = `${game.system}/${game.file}`;
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch { /* */ }
+        if (!Array.isArray(list)) list = [];
+        list = list.filter((e) => `${e.system}/${e.file}` !== key);
+        list.unshift({ system: game.system, file: game.file, title: game.title, cover: game.cover || null, at: Date.now() });
+        localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+      } catch { /* */ }
+    }
+
+    /* -------------------- Manette (Gamepad API) --------------------
+       Les navigateurs n’exposent une manette à la page qu’après une pression
+       de bouton pendant que l’onglet est au premier plan. */
+    function listPads() {
+      if (!navigator.getGamepads) return [];
+      // getGamepads() renvoie un tableau sparse (index hardware) — important sous Linux/Chrome
+      const raw = navigator.getGamepads();
+      const out = [];
+      for (let i = 0; i < raw.length; i += 1) {
+        if (raw[i]) out.push(raw[i]);
+      }
+      return out;
+    }
+
+    function isRealPad(pad) {
+      const id = String(pad.id || "");
+      if (/headset|jabra|headphone|microphone|audio|speaker/i.test(id)) return false;
+      // Sous Linux, certaines manettes Xbox s'affichent comme "Microsoft X-Box" / "xpad"
+      return true;
+    }
+
+    function refreshPads() {
+      const pads = listPads().filter(isRealPad);
+      const all = listPads();
+      if (!pads.length) {
+        padPill.hidden = true;
+        padList.hidden = true;
+        const extra = all.length
+          ? " (des périphériques non-manette sont listés par le navigateur)"
+          : "";
+        padStatus.innerHTML = `Aucune manette active${extra}. <strong>Clique dans la zone de jeu</strong>, puis appuie sur un bouton. Linux : vérifie que la manette apparaît dans <code>jstest</code> / Paramètres → Manettes.`;
+        return;
+      }
+      padPill.hidden = false;
+      padPill.textContent = `🎮 ${pads.length}`;
+      padPill.classList.add("good");
+      padStatus.innerHTML = `${pads.length} manette(s) vue(s) par le navigateur. Dans l’émulateur : ⚙️ → <strong>Control Settings</strong> → menu « Connected Gamepad » → choisis ta manette (pas « Not Connected »), puis <strong>Set</strong> sur chaque bouton si besoin.`;
+      padList.hidden = false;
+      padList.replaceChildren(
+        ...pads.map((pad, i) => {
+          const li = document.createElement("li");
+          const id = pad.id || `Manette ${i + 1}`;
+          const mapping = pad.mapping === "standard" ? "standard" : (pad.mapping || "raw");
+          const btns = pad.buttons ? pad.buttons.length : 0;
+          li.textContent = `${i + 1}. ${id} · ${btns} boutons · mapping ${mapping} · index ${pad.index}`;
+          return li;
+        }),
+      );
+    }
+
+    window.addEventListener("gamepadconnected", (e) => {
+      refreshPads();
+      padStatus.innerHTML = `Manette connectée : <strong>${e.gamepad.id || "OK"}</strong>. Appuie sur un bouton pour l’activer dans le jeu.`;
+    });
+    window.addEventListener("gamepaddisconnected", () => refreshPads());
+
+    // Poll léger : certains navigateurs n’émettent gamepadconnected qu’après input
+    let padPoll = null;
+    let padRaf = null;
+    function startPadPoll() {
+      if (!padPoll) padPoll = setInterval(refreshPads, 800);
+      // Boucle rAF courte : sous Linux, getGamepads() ne se met à jour que si on le lit régulièrement après un input
+      if (padRaf) return;
+      let frames = 0;
+      const tick = () => {
+        listPads(); // lecture active
+        refreshPads();
+        frames += 1;
+        if (frames < 120) padRaf = requestAnimationFrame(tick); // ~2 s
+        else padRaf = null;
+      };
+      padRaf = requestAnimationFrame(tick);
+    }
+    function stopPadPoll() {
+      if (padPoll) { clearInterval(padPoll); padPoll = null; }
+      if (padRaf) { cancelAnimationFrame(padRaf); padRaf = null; }
+    }
+
+    // Capture d’un premier input pour « réveiller » la Gamepad API
+    window.addEventListener("gamepadconnected", startPadPoll);
+    document.addEventListener("visibilitychange", () => {
+      document.body.dataset.tab = document.hidden ? "hidden" : "visible";
+      if (!document.hidden) refreshPads();
+    });
+
+    document.getElementById("btn-focus")?.addEventListener("click", () => {
+      const el = document.getElementById("ejs");
+      el.focus({ preventScroll: true });
+      // Certains navigateurs n’exposent getGamepads() qu’après interaction
+      refreshPads();
+      startPadPoll();
+      padStatus.innerHTML = "Page focalisée — <strong>appuie maintenant sur A</strong> sur ta manette Xbox.";
+    });
+
+    function reportCrash(message, source) {
+      const crash = document.getElementById("crash");
+      crash.hidden = false;
+      loading.hidden = true;
+      document.getElementById("crash-title").textContent =
+        `L'émulateur s'est arrêté${mode === "perf" ? "" : " (mode compat)"}`;
+      document.getElementById("crash-detail").textContent = `${source || "erreur"} : ${message}`;
+      const compatBtn = document.getElementById("crash-compat");
+      if (mode === "compat") compatBtn.hidden = true;
+      else {
+        compatBtn.hidden = false;
+        compatBtn.onclick = () => switchMode("compat");
+      }
+    }
+
+    function switchMode(next) {
+      try { localStorage.setItem("retro-mode", next); } catch { /* */ }
+      const url = new URL(location.href);
+      url.searchParams.delete("safe");
+      url.searchParams.delete("perf");
+      if (next === "compat") url.searchParams.set("safe", "1");
+      else url.searchParams.set("perf", "1");
+      location.href = url.toString();
+    }
+
+    function fillDiagnostic(system, config, netplayActive) {
+      const rows = [
+        ["Mode", mode === "compat" ? "compatibilité 🛡️" : "performance ⚡"],
+        ["Multi-thread", useThreads ? "activé" : threadsAvailable ? "disponible (désactivé)" : "indisponible"],
+        ["Isolation COOP/COEP", self.crossOriginIsolated ? "oui" : "non"],
+        ["WebGL", `${gl.label}${gl.software ? " (logiciel ⚠️)" : ""}`],
+        ["GPU", gl.renderer || "—"],
+        ["Manettes", `${listPads().length} détectée(s)`],
+        ["Core", system.core || system.id],
+        ["Netplay", netplayActive ? `actif → ${config.netplayServer || "?"}` : config.netplayServer ? "serveur dispo" : "non configuré"],
+      ];
+      document.getElementById("diag-list").replaceChildren(
+        ...rows.map(([key, value]) => {
+          const li = document.createElement("li");
+          const strong = document.createElement("strong");
+          strong.textContent = `${key} : `;
+          li.append(strong, document.createTextNode(value));
+          return li;
+        }),
+      );
+
+      const tips = [];
+      if (system.id === "nds") {
+        tips.push(`ℹ️ <strong>Nintendo DS</strong> : le rendu 3D est coûteux. Si ça lag :
+          (1) menu ⚙️ → Frame Skip à 1 ou 2,
+          (2) désactive les shaders,
+          (3) ferme les autres onglets,
+          (4) mode performance + multi-thread activé.`);
+      }
+      if (system.id === "psp") {
+        tips.push(`ℹ️ <strong>PSP</strong> : très exigeant. Menu ⚙️ → résolution 1x, frame skip si besoin ; le mode performance (multi-thread) est recommandé (voire obligatoire).`);
+      }
+      if (system.id === "arcade") {
+        tips.push(`ℹ️ <strong>Arcade</strong> : utilise des ROMsets <strong>FBNeo</strong> (fichiers .zip non décompressés). Un ROMset MAME récent ne démarre pas forcément — en cas de souci, essaie un autre core dans ⚙️ ou le launcher natif.`);
+      }
+      if (gl.software && mode === "perf") {
+        tips.push(`⚠️ WebGL logiciel détecté — passe en <a href="#" data-mode="compat">compatibilité</a> ou active l’accélération GPU du navigateur.`);
+      }
+      if (!storageOk) tips.push(`ℹ️ Navigation privée : pas de cache ROM ni de sauvegardes auto.`);
+      if (useThreads && isGecko) {
+        tips.push(`ℹ️ Firefox + multi-thread : en cas de plantage, <a href="#" data-mode="compat">mode compatibilité</a>.`);
+      }
+      if (netplayActive) {
+        tips.push(`ℹ️ <strong>Netplay actif</strong> : clique l'icône 🌐 dans la barre de l'émulateur pour créer ou rejoindre une salle. Les deux joueurs doivent être sur le même jeu.`);
+      }
+      tips.push(`ℹ️ Manette Xbox : USB ou Bluetooth apparié au système, puis bouton A sur cette page. Mapping dans ⚙️ → Contrôles.`);
+
+      document.getElementById("diag-tips").replaceChildren(
+        ...tips.map((html) => {
+          const p = document.createElement("p");
+          p.className = "hint";
+          p.innerHTML = html;
+          return p;
+        }),
+      );
+      document.querySelectorAll("#diag-tips a[data-mode]").forEach((link) => {
+        link.addEventListener("click", (e) => {
+          e.preventDefault();
+          switchMode(link.dataset.mode);
+        });
+      });
+    }
+
+    window.addEventListener("error", (event) => {
+      const msg = event.message || String(event.error || "");
+      if (/RuntimeError|abort\(|out of memory|OOM|wasm|WebAssembly|memory access/i.test(msg)) {
+        reportCrash(msg, "runtime");
+      }
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+      const msg = event.reason?.message || String(event.reason || "");
+      if (/RuntimeError|abort\(|out of memory|OOM|wasm|WebAssembly/i.test(msg)) {
+        reportCrash(msg, "promise");
+      }
+    });
+
+    document.getElementById("btn-fullscreen").addEventListener("click", async () => {
+      const target = document.getElementById("ejs");
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else if (target.requestFullscreen) await target.requestFullscreen();
+        else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+      } catch (error) {
+        console.warn("Fullscreen :", error);
+      }
+    });
+    document.getElementById("btn-reload").addEventListener("click", () => location.reload());
+    document.getElementById("crash-reload").addEventListener("click", () => location.reload());
+
+    /* Vide le cache des ROMs/cores/bios + les réglages de l'émulateur.
+       Les sauvegardes (EmulatorJS-states) ne sont PAS supprimées. */
+    function resetEmulatorData() {
+      try { localStorage.removeItem("ejs-settings"); } catch { /* */ }
+      if (window.indexedDB) {
+        for (const name of ["EmulatorJS-roms", "EmulatorJS-bios", "EmulatorJS-core"]) {
+          try { indexedDB.deleteDatabase(name); } catch { /* */ }
+        }
+      }
+      location.reload();
+    }
+    document.getElementById("btn-reset").addEventListener("click", resetEmulatorData);
+    document.getElementById("crash-reset").addEventListener("click", resetEmulatorData);
+
+    async function boot() {
+      if (!systemId || !fileName) return fail("Paramètres manquants.");
+
+      setLoading("Chargement du catalogue…");
+      startPadPoll();
+      refreshPads();
+
+      const [library, config] = await Promise.all([
+        fetch("/api/library").then((r) => {
+          if (!r.ok) throw new Error(`Catalogue HTTP ${r.status}`);
+          return r.json();
+        }),
+        fetch("/api/config").then((r) => r.json()).catch(() => ({})),
+      ]);
+
+      const system = library.systems.find((e) => e.id === systemId);
+      if (!system) return fail(`Console inconnue : ${systemId}`);
+      const game = system.games.find((e) => e.file === fileName);
+      if (!game) return fail(`ROM introuvable : ${fileName}`);
+
+      document.title = `${game.title} — Retro`;
+      titleEl.textContent = game.title;
+      document.getElementById("game-system").textContent = system.label;
+
+      const cover = document.getElementById("cover");
+      if (game.cover) {
+        cover.src = game.cover;
+        cover.hidden = false;
+        cover.alt = game.title;
+      }
+
+      // Console sans émulateur navigateur : panneau « launcher natif » et on s'arrête là.
+      if (!system.core) return showNativeOnly(system, game);
+
+      const modePill = document.getElementById("game-mode");
+      modePill.textContent = useThreads ? "multi-thread ⚡" : "compat 🛡️";
+      modePill.classList.add(useThreads ? "good" : "warn");
+
+      const modeLink = document.getElementById("mode-link");
+      modeLink.hidden = false;
+      modeLink.textContent = mode === "compat" ? "⚡ Perf" : "🛡️ Compat";
+      modeLink.addEventListener("click", () => switchMode(mode === "compat" ? "perf" : "compat"));
+
+      if (gl.software && mode === "perf") {
+        notice.hidden = false;
+        notice.innerHTML = `⚠️ Rendu WebGL logiciel — perfs limitées.
+          <button class="btn sm" type="button" id="notice-compat">Mode compat</button>`;
+        document.getElementById("notice-compat")?.addEventListener("click", () => switchMode("compat"));
+      } else if (system.id === "nds") {
+        notice.hidden = false;
+        notice.innerHTML = useThreads
+          ? `ℹ️ DS (melonDS) : si lag 3D → ⚙️ Frame Skip 1–2, désactive les shaders. Si plantage → mode compatibilité.`
+          : `ℹ️ DS en mode compatibilité (plus stable). Pour plus de perf : passe en performance ⚡ si multi-thread dispo.`;
+      } else if (system.id === "psp") {
+        notice.hidden = false;
+        notice.innerHTML = useThreads
+          ? `ℹ️ <strong>PSP</strong> : exigeant — si ça rame : ⚙️ résolution 1x + frame skip, ou passe par le <a href="/client.html">launcher natif</a> (recommandé).`
+          : threadsAvailable
+            ? `⚠️ <strong>PSP</strong> exige le multi-thread : <button class="btn sm" type="button" id="notice-perf">⚡ Passer en performance</button>`
+            : `⚠️ <strong>PSP</strong> nécessite le multi-thread, indisponible dans ce navigateur. Essaie Chrome/Edge à jour, ou le <a href="/client.html">launcher natif</a>.`;
+        document.getElementById("notice-perf")?.addEventListener("click", () => switchMode("perf"));
+      }
+
+      // Netplay : activé dès qu'un serveur est configuré (plus besoin de ?netplay=1)
+      const netplayServer = String(config.netplayServer || "").trim().replace(/\/$/, "") + (config.netplayServer ? "/" : "");
+      const netplayEnabled = Boolean(netplayServer && netplayServer !== "/");
+      const netplayLink = document.getElementById("netplay-link");
+      if (netplayEnabled) {
+        netplayLink.hidden = false;
+        netplayLink.textContent = "👥 Netplay";
+        netplayLink.classList.add("active");
+        netplayLink.href = "#";
+        netplayLink.title = "Le bouton 🌐 dans l'émulateur ouvre le panneau Netplay";
+        netplayLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          document.getElementById("netplay-help")?.scrollIntoView({ behavior: "smooth" });
+        });
+        const help = document.getElementById("netplay-help");
+        if (help) help.hidden = false;
+      }
+
+      const launcherBtn = document.getElementById("btn-launcher");
+      if (launcherBtn) {
+        launcherBtn.href = `kirbyretro://play?system=${encodeURIComponent(system.id)}&file=${encodeURIComponent(game.file)}`;
+        launcherBtn.addEventListener("click", () => {
+          window.setTimeout(() => showLauncherToastHelp(), 1400);
+        });
+        if (HEAVY.has(system.id)) {
+          launcherBtn.textContent = "🖥 Launcher natif (recommandé)";
+          // Bannière DS/N64/PSX
+          if (notice.hidden) {
+            notice.hidden = false;
+            notice.innerHTML = `ℹ️ <strong>${system.label}</strong> est plus fluide dans le <a href="${launcherBtn.href}">launcher natif</a> (RetroArch / melonDS) que dans le navigateur — <a href="/client.html">installer le launcher</a>.`;
+          }
+        }
+      }
+
+      fillDiagnostic(system, config, netplayEnabled);
+      pushRecent(game);
+
+      setLoading("BIOS / ressources…");
+      let biosUrl = "";
+      if (system.id === "psx") {
+        for (const candidate of ["scph1001.bin", "scph5500.bin", "scph7001.bin", "psxonpsp660.bin"]) {
+          const url = `/roms/psx/bios/${candidate}`;
+          const response = await fetch(url, { method: "HEAD" }).catch(() => null);
+          if (response?.ok) { biosUrl = url; break; }
+        }
+      }
+
+      setLoading("Démarrage de l'émulateur…");
+
+      let volume = 0.7;
+      if (storageOk) {
+        try {
+          const saved = JSON.parse(localStorage.getItem("ejs-settings") || "null");
+          if (saved && typeof saved.volume === "number") volume = saved.volume;
+        } catch { /* */ }
+      }
+
+      window.EJS_player = "#ejs";
+      window.EJS_core = system.id;
+      window.EJS_gameUrl = `/roms/${encodeURIComponent(system.id)}/${encodeURIComponent(game.file)}`;
+      window.EJS_pathtodata = "/ejs/data/";
+      window.EJS_gameName = game.title;
+      window.EJS_gameID = numericId(`${system.id}/${game.file}`);
+      // EJS_gameID doit être un nombre unique par ROM — obligatoire pour le netplay
+      if (!window.EJS_gameID || window.EJS_gameID < 1) window.EJS_gameID = 1;
+      window.EJS_color = "#3a9fd8";
+      window.EJS_backgroundColor = "#1a2830";
+      window.EJS_volume = volume;
+      window.EJS_startOnLoaded = true;
+      window.EJS_askBeforeExit = false;
+      window.EJS_Buttons = {
+        fullscreen: { visible: true },
+        saveState: { visible: true },
+        loadState: { visible: true },
+        gamepad: { visible: true },
+        ...(netplayEnabled ? { netplay: { visible: true } } : {}),
+      };
+
+      // Options sûres uniquement (les clés invalides peuvent empêcher un core de démarrer)
+      window.EJS_defaultOptions = {
+        "save-state-location": "browser",
+        vsync: "enabled",
+        fps: HEAVY.has(system.id) ? "show" : "hide",
+      };
+
+      if (biosUrl) window.EJS_biosUrl = biosUrl;
+
+      if (useThreads) window.EJS_threads = true;
+      if (mode === "compat") {
+        window.EJS_threads = false;
+        if (!gl.webgl2 || gl.software) window.EJS_forceLegacyCores = true;
+      }
+
+      if (!storageOk) {
+        window.EJS_disableLocalStorage = true;
+        window.EJS_cacheConfig = { enabled: false, cacheMaxSizeMB: 0, cacheMaxAgeMins: 0 };
+      } else {
+        window.EJS_cacheConfig = {
+          enabled: true,
+          cacheMaxSizeMB: system.id === "nds" ? 768 : 512,
+          cacheMaxAgeMins: 60 * 24 * 14,
+        };
+      }
+
+      if (netplayEnabled) {
+        // Serveur de rooms (Socket.IO) — déjà en prod sur netplay.kirbytrim.buzz
+        window.EJS_netplayServer = netplayServer;
+        // STUN + TURN pour traverser les NAT (obligatoire hors LAN)
+        window.EJS_netplayICEServers = (config.netplayIceServers && config.netplayIceServers.length)
+          ? config.netplayIceServers
+          : [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+              { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+              { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+            ];
+        // Requis sur certaines builds EJS pour afficher le panneau 🌐
+        window.EJS_EXPERIMENTAL_NETPLAY = true;
+        // EmulatorJS 4.2.3 (data/src/emulator.js) : netplayEnabled exige EJS_DEBUG_XX
+        // ET EJS_EXPERIMENTAL_NETPLAY — sinon le bouton 🌐 reste masqué.
+        window.EJS_DEBUG_XX = true;
+      }
+
+      // Quand le jeu démarre : focus + manette + hide loader
+      window.EJS_onGameStart = () => {
+        loading.hidden = true;
+        toolbar.hidden = false;
+        const el = document.getElementById("ejs");
+        el.focus({ preventScroll: true });
+        refreshPads();
+        startPadPoll();
+      };
+
+      const observer = new MutationObserver(() => {
+        if (document.querySelector("#ejs canvas, #ejs iframe, #ejs video")) {
+          loading.hidden = true;
+          toolbar.hidden = false;
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.getElementById("ejs"), { childList: true, subtree: true });
+      setTimeout(() => {
+        loading.hidden = true;
+        toolbar.hidden = false;
+        observer.disconnect();
+      }, 45_000);
+
+      const script = document.createElement("script");
+      script.src = "/ejs/data/loader.js";
+      script.onerror = () => fail("Bundle EmulatorJS introuvable (scripts/fetch-ejs.sh).");
+      document.body.append(script);
+    }
+
+    boot().catch((error) => fail(`Erreur : ${error.message}`));
+  </script>
+</body>
+</html>

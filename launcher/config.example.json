@@ -1,0 +1,20 @@
+{
+  "site_url": "https://retro.kirbytrim.buzz",
+  "roms_dir": "",
+  "download_missing_roms": true,
+  "retroarch": {
+    "path": "",
+    "cores_dir": ""
+  },
+  "emulators": {
+    "nds": { "path": "", "args": ["{rom}"] },
+    "n64": { "path": "", "args": ["{rom}"] },
+    "psx": { "path": "", "args": ["{rom}"] },
+    "snes": { "path": "", "args": ["{rom}"] },
+    "nes": { "path": "", "args": ["{rom}"] },
+    "gba": { "path": "", "args": ["{rom}"] },
+    "gb": { "path": "", "args": ["{rom}"] }
+  },
+  "prefer_native_for": ["nds", "n64", "psx"],
+  "netplay": { "nickname": "", "port": 55435, "last_host": "", "use_relay": false }
+}
