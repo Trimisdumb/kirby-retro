@@ -1,0 +1,85 @@
+# Construit le launcher C++/Qt (aperçu) pour Windows et Linux.
+# Déclenchement manuel : Actions → build-launcher-cpp → Run workflow.
+name: build-launcher-cpp
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # Linux : construit dans Debian 12 (glibc 2.36) pour rester compatible avec
+  # les distributions courantes, puis empaquette avec linuxdeploy (Qt embarqué).
+  linux:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dépendances
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            qt6-base-dev qt6-base-dev-tools g++ libgl1-mesa-dev cmake ninja-build \
+            patchelf wget ca-certificates > /dev/null
+      - name: Compiler
+        run: |
+          cmake -S launcher-cpp -B build-cpp -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-cpp
+      - name: Empaqueter (linuxdeploy + Qt)
+        run: |
+          set -e
+          mkdir -p AppDir/usr/bin
+          cp build-cpp/kirby-retro-launcher-cpp AppDir/usr/bin/
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+          cat > AppDir/kirby-retro-launcher-cpp.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=Kirby Retro Launcher
+          Exec=kirby-retro-launcher-cpp
+          Icon=kirby-retro-launcher-cpp
+          Categories=Game;
+          EOF
+          cp public/favicon.png AppDir/kirby-retro-launcher-cpp.png
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          QMAKE=$(command -v qmake6 || command -v qmake || echo /usr/lib/qt6/bin/qmake6)
+          [ -x "$QMAKE" ] || QMAKE=/usr/lib/qt6/bin/qmake6
+          ln -sf "$QMAKE" /usr/local/bin/qmake
+          export QMAKE
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            --desktop-file AppDir/kirby-retro-launcher-cpp.desktop \
+            --icon-file AppDir/kirby-retro-launcher-cpp.png --plugin qt
+          printf '#!/bin/sh\ncd "$(dirname "$0")"\nexec ./AppRun "$@"\n' > AppDir/lancer.sh
+          chmod +x AppDir/lancer.sh
+          tar -C AppDir -czf kirby-retro-launcher-cpp-0.1-linux.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-linux
+          path: kirby-retro-launcher-cpp-0.1-linux.tar.gz
+
+  # Windows : Qt officiel (aqt) + MSVC, bibliothèques copiées par windeployqt.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.0'
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Compiler
+        run: |
+          cmake -S launcher-cpp -B build-cpp -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-cpp --config Release
+      - name: Empaqueter (windeployqt)
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist/kirby-retro-launcher-cpp
+          cp build-cpp/Release/kirby-retro-launcher-cpp.exe dist/kirby-retro-launcher-cpp/
+          windeployqt --release --no-translations --no-system-d3d-compiler \
+            dist/kirby-retro-launcher-cpp/kirby-retro-launcher-cpp.exe
+          cd dist && 7z a ../kirby-retro-launcher-cpp-0.1-windows.zip kirby-retro-launcher-cpp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpp-windows
+          path: kirby-retro-launcher-cpp-0.1-windows.zip
