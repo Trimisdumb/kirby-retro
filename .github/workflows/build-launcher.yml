@@ -1,0 +1,61 @@
+name: Exécutables du launcher
+
+# À la demande, ou automatiquement sur un tag « launcher-v… ».
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "launcher-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows, linux]
+        include:
+          - platform: windows
+            os: windows-latest
+          - platform: linux
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Version du launcher
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(PYTHONPATH=launcher python -c "import retro_launcher; print(retro_launcher.__version__)")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: PyInstaller
+        run: python -m pip install --disable-pip-version-check pyinstaller
+
+      - name: Construction
+        working-directory: launcher
+        run: pyinstaller --clean --noconfirm kirby-retro-launcher.spec
+
+      - name: Renommage
+        shell: bash
+        working-directory: launcher
+        run: |
+          mkdir -p out
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            mv dist/kirby-retro-launcher.exe "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-windows.exe"
+          else
+            mv dist/kirby-retro-launcher "out/kirby-retro-launcher-${{ steps.version.outputs.version }}-linux"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kirby-retro-launcher-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: launcher/out/*
+          if-no-files-found: error
