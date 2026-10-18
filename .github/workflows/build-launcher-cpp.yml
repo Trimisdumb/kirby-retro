@@ -18,7 +18,7 @@ jobs:
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends \
             qt6-base-dev qt6-base-dev-tools g++ libgl1-mesa-dev cmake ninja-build \
-            patchelf wget ca-certificates > /dev/null
+            patchelf wget ca-certificates imagemagick > /dev/null
       - name: Compiler
         run: |
           cmake -S launcher-cpp -B build-cpp -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -39,7 +39,7 @@ jobs:
           Icon=kirby-retro-launcher-cpp
           Categories=Game;
           EOF
-          cp public/favicon.png AppDir/kirby-retro-launcher-cpp.png
+          convert public/favicon.png -resize 256x256! AppDir/kirby-retro-launcher-cpp.png
           export APPIMAGE_EXTRACT_AND_RUN=1
           QMAKE=$(command -v qmake6 || command -v qmake || echo /usr/lib/qt6/bin/qmake6)
           [ -x "$QMAKE" ] || QMAKE=/usr/lib/qt6/bin/qmake6
