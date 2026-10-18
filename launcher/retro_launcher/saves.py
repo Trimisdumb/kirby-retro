@@ -19,7 +19,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .detect import resolve_core_path, retroarch_cfg_candidates
+from .detect import resolve_cfg_path, resolve_core_path, retroarch_cfg
 
 # Tailles possibles d'une sauvegarde DS (128 Ko à 2 Mo, et les petites cartes
 # de jeux GBA/GB). Sert à reconnaître un .dsv brut derrière son en-tête.
@@ -205,17 +205,6 @@ class SaveFile:
 # ---------------------------------------------------------------------------
 # dossier de sauvegardes de RetroArch
 
-def _retroarch_cfg(cfg_candidates: list[Path] | None = None) -> tuple[Path | None, str]:
-    """Premier retroarch.cfg trouvé et son contenu."""
-    for cfg in cfg_candidates if cfg_candidates is not None else retroarch_cfg_candidates():
-        if cfg.is_file():
-            try:
-                return cfg, cfg.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-    return None, ""
-
-
 def _cfg_flag(text: str, key: str) -> bool:
     for line in text.splitlines():
         line = line.strip()
@@ -225,22 +214,9 @@ def _cfg_flag(text: str, key: str) -> bool:
     return False
 
 
-def _resolve_retroarch_path(value: str, base: Path) -> Path | None:
-    """Interprète une valeur de retroarch.cfg ("default", ":/chemin", "~/...")."""
-    value = value.strip()
-    if not value or value in ("default", ":", ":/"):
-        return None
-    if value.startswith(":"):
-        value = value[1:]
-    if value.startswith("~"):
-        return Path(value).expanduser()
-    path = Path(value)
-    return path if path.is_absolute() else base / path
-
-
 def retroarch_save_dir(cfg_candidates: list[Path] | None = None) -> tuple[Path | None, str]:
     """Dossier des sauvegardes de RetroArch, avec une explication lisible."""
-    cfg, text = _retroarch_cfg(cfg_candidates)
+    cfg, text = retroarch_cfg(cfg_candidates)
     if cfg is not None:
         value: str | None = None
         for line in text.splitlines():
@@ -249,7 +225,7 @@ def retroarch_save_dir(cfg_candidates: list[Path] | None = None) -> tuple[Path |
                 _, _, value = line.partition("=")
                 value = value.strip().strip('"').strip("'")
                 break
-        resolved = _resolve_retroarch_path(value or "default", cfg.parent)
+        resolved = resolve_cfg_path(value or "default", cfg.parent)
         if resolved is not None:
             return resolved, f"retroarch.cfg ({cfg}) → savefile_directory"
         return cfg.parent / "saves", f"retroarch.cfg ({cfg}) → dossier « saves »"
@@ -309,7 +285,7 @@ def retroarch_target_dir(
     if base is None:
         return None, why
     stem = Path(file).stem
-    cfg, text = _retroarch_cfg(cfg_candidates)
+    cfg, text = retroarch_cfg(cfg_candidates)
     sort = cfg is not None and _cfg_flag(text, "sort_savefiles_enable")
     subdirs = _ra_search_dirs(base)[1:]
     order = [*subdirs, base] if sort else [base, *subdirs]
@@ -456,6 +432,91 @@ def _find_dolphin_saves(
             )
     found.sort(key=lambda save: save.mtime(), reverse=True)
     return found
+
+
+# ---------------------------------------------------------------------------
+# données de la console Wii (Miis, réglages) : Dolphin natif → RetroArch
+
+# La base des Miis et les réglages de la console vivent hors des dossiers de
+# titre : sans elles, pas de Miis dans RetroArch et une langue anglaise.
+WII_CONSOLE_FILES: tuple[Path, ...] = (
+    Path("Wii/shared2/menu/FaceLib/RFL_DB.dat"),  # base des Miis
+    Path("Wii/shared2/sys/SYSCONF"),  # langue et réglages du système Wii
+)
+
+_WII_LANGUAGES = {
+    0: "japonais",
+    1: "anglais",
+    2: "allemand",
+    3: "français",
+    4: "espagnol",
+    5: "italien",
+    6: "néerlandais",
+    7: "chinois simplifié",
+    8: "chinois traditionnel",
+    9: "coréen",
+}
+
+
+def wii_sysconf_language(path: Path) -> int | None:
+    """Langue du système Wii réglée dans un SYSCONF (octet de « IPL.LNG »)."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    index = data.rfind(b"IPL.LNG")
+    # L'octet d'en-tête 0x66 annonce une valeur d'un octet ; la langue suit le nom.
+    if index < 1 or index + 8 > len(data) or data[index - 1] != 0x66:
+        return None
+    return data[index + 7]
+
+
+def _sync_wii_console_files(source: Path, dest: Path) -> list[str]:
+    """Copie Miis et réglages Wii de source vers dest (anciennes copies en .bak)."""
+    notes: list[str] = []
+    for rel in WII_CONSOLE_FILES:
+        src_file = source / rel
+        if not src_file.is_file():
+            continue
+        dst_file = dest / rel
+        fresh = not dst_file.is_file()
+        if not fresh:
+            try:
+                fresh = src_file.stat().st_mtime > dst_file.stat().st_mtime
+            except OSError:
+                fresh = False
+        if not fresh and rel.name == "SYSCONF":
+            # La langue système se règle dans Dolphin, pas dans RetroArch :
+            # en cas de désaccord, c'est le choix de Dolphin qui gagne.
+            lang_src = wii_sysconf_language(src_file)
+            lang_dst = wii_sysconf_language(dst_file)
+            fresh = lang_src is not None and lang_dst is not None and lang_src != lang_dst
+        if not fresh:
+            continue
+        dst_file.parent.mkdir(parents=True, exist_ok=True)
+        bak = backup_existing(dst_file)
+        shutil.copy2(src_file, dst_file)
+        bak_note = f" — ancienne version en {bak.name}" if bak is not None else ""
+        if rel.name == "RFL_DB.dat":
+            notes.append(f"Miis copiés vers RetroArch{bak_note}")
+        else:
+            lang = wii_sysconf_language(src_file)
+            language = _WII_LANGUAGES.get(lang, "?") if lang is not None else "?"
+            notes.append(f"réglages Wii copiés vers RetroArch (langue : {language}){bak_note}")
+    return notes
+
+
+def sync_dolphin_console_data(cfg_candidates: list[Path] | None = None) -> list[str]:
+    """Miis + réglages de la console : Dolphin natif → Dolphin de RetroArch.
+
+    Sens unique exprès : dans l'autre direction, une base de Miis vide
+    écraserait celle de ton Dolphin.
+    """
+    source = next((root for _label, root in dolphin_roots() if (root / "Wii").is_dir()), None)
+    dest = retroarch_dolphin_dir(cfg_candidates) if source is not None else None
+    if source is None or dest is None:
+        return []
+    return _sync_wii_console_files(source, dest)
 
 
 # ---------------------------------------------------------------------------
@@ -663,7 +724,14 @@ def import_to_retroarch(
         raise SaveError("aucune sauvegarde sélectionnée")
     source = sources[0]
     if source.kind == "dolphin-title":
-        return _copy_dolphin_title(source, to_retroarch=True, cfg_candidates=cfg_candidates)
+        message = _copy_dolphin_title(source, to_retroarch=True, cfg_candidates=cfg_candidates)
+        if system == "wii":
+            try:
+                notes = sync_dolphin_console_data(cfg_candidates)
+            except Exception:  # noqa: BLE001 — la copie de sauvegarde a déjà réussi
+                notes = []
+            message = " · ".join([message, *notes]) if notes else message
+        return message
     target_dir, why = retroarch_target_dir(system, file, cfg_candidates, cores_dir)
     if target_dir is None:
         raise SaveError(why)
@@ -812,14 +880,21 @@ def auto_sync_before_launch(
         natives = [save for save in saves if not save.source.startswith("RetroArch")]
         retro = [save for save in saves if save.source.startswith("RetroArch")]
         if to_retroarch:
-            if not natives:
-                return None
-            if retro and retro[0].mtime() >= natives[0].mtime():
-                return None
-            import_to_retroarch(
-                system, file, natives, cfg_candidates=cfg_candidates, cores_dir=cores_dir
-            )
-            return f"Sauvegarde importée vers RetroArch ({natives[0].source})"
+            console_notes: list[str] = []
+            if system == "wii":
+                # Miis et réglages de la console : indépendants des sauvegardes.
+                try:
+                    console_notes = sync_dolphin_console_data(cfg_candidates)
+                except Exception:  # noqa: BLE001
+                    console_notes = []
+            save_note = ""
+            if natives and not (retro and retro[0].mtime() >= natives[0].mtime()):
+                import_to_retroarch(
+                    system, file, natives, cfg_candidates=cfg_candidates, cores_dir=cores_dir
+                )
+                save_note = f"Sauvegarde importée vers RetroArch ({natives[0].source})"
+            parts = [note for note in (save_note, *console_notes) if note]
+            return " · ".join(parts) if parts else None
         if not retro:
             return None
         if natives and natives[0].mtime() >= retro[0].mtime():

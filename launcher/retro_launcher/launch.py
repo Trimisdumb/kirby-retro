@@ -13,6 +13,7 @@ from .cores import RETROARCH_CORES
 from .detect import cores_dirs, is_flatpak, resolve_core_path, retroarch_executable_ok
 from .netplay import DEFAULT_PORT as NETPLAY_DEFAULT_PORT, write_appendconfig
 from .saves import auto_sync_before_launch
+from .sysfiles import ensure_dolphin_sysfiles
 
 
 class LaunchError(Exception):
@@ -102,6 +103,22 @@ def retroarch_command(ra_path: str) -> list[str]:
     return [value]
 
 
+def _ensure_ra_sysfiles(
+    config: dict[str, Any], system: str, core: str, progress: callable | None
+) -> None:
+    """Wii/GameCube : installe les fichiers système Dolphin manquants pour RetroArch."""
+    if system not in ("wii", "gamecube") or "dolphin" not in Path(core).stem.lower():
+        return
+    if not config.get("install_dolphin_sysfiles", True):
+        return
+    try:
+        note = ensure_dolphin_sysfiles(progress=progress)
+    except Exception:  # noqa: BLE001 — le lancement continue sans les fichiers
+        return
+    if note and progress:
+        progress(note)
+
+
 def _resolve_core(ra: dict[str, Any], system: str) -> str:
     """Chemin du core pour ce système, sinon erreur explicite et utile."""
     core = resolve_core_path(ra.get("cores_dir"), system)
@@ -131,6 +148,7 @@ def launch_retroarch(
     if not retroarch_executable_ok(ra_path):
         return False
     core = _resolve_core(ra, system)
+    _ensure_ra_sysfiles(config, system, core, progress)
     note = auto_sync_before_launch(config, system, rom.name, rom_path=rom, to_retroarch=True)
     if note and progress:
         progress(note)
@@ -166,6 +184,7 @@ def launch_netplay(
             "Installe RetroArch (Paramètres → Diagnostic pour vérifier), puis réessaie."
         )
     core = _resolve_core(ra, system)
+    _ensure_ra_sysfiles(config, system, core, progress)
     note = auto_sync_before_launch(config, system, file, rom_path=rom, to_retroarch=True)
     if note and progress:
         progress(note)

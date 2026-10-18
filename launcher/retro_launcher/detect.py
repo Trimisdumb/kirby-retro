@@ -132,6 +132,41 @@ def retroarch_cfg_candidates() -> list[Path]:
     ]
 
 
+def retroarch_cfg(cfg_candidates: list[Path] | None = None) -> tuple[Path | None, str]:
+    """Premier retroarch.cfg trouvé et son contenu."""
+    candidates = cfg_candidates if cfg_candidates is not None else retroarch_cfg_candidates()
+    for cfg in candidates:
+        if cfg.is_file():
+            try:
+                return cfg, cfg.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+    return None, ""
+
+
+def cfg_value(text: str, key: str) -> str | None:
+    """Valeur d'une clé du retroarch.cfg (première ligne qui la déclare)."""
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(key):
+            _, _, value = line.partition("=")
+            return value.strip().strip('"').strip("'")
+    return None
+
+
+def resolve_cfg_path(value: str, base: Path) -> Path | None:
+    """Interprète une valeur de chemin de retroarch.cfg ("default", ":/…", "~/…")."""
+    value = value.strip()
+    if not value or value in ("default", ":", ":/"):
+        return None
+    if value.startswith(":"):
+        value = value[1:]
+    if value.startswith("~"):
+        return Path(value).expanduser()
+    path = Path(value)
+    return path if path.is_absolute() else base / path
+
+
 def cfg_libretro_directory() -> Path | None:
     """Dossier de cores déclaré par RetroArch lui-même (retroarch.cfg → libretro_directory)."""
     for cfg in retroarch_cfg_candidates():

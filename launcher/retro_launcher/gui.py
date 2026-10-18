@@ -587,14 +587,20 @@ class LauncherApp(tk.Tk):
                         text="Importer automatiquement les sauvegardes des émulateurs natifs au lancement",
                         variable=auto_var).grid(row=5, column=0, columnspan=3,
                                                 sticky="w", pady=(2, 2))
+        sysfiles_var = tk.BooleanVar(value=bool(cfg.get("install_dolphin_sysfiles", True)))
+        ttk.Checkbutton(body,
+                        text="Installer les fichiers système Dolphin manquants pour RetroArch (Wii)",
+                        variable=sysfiles_var).grid(row=6, column=0, columnspan=3,
+                                                    sticky="w", pady=(2, 2))
         ttk.Label(body, text="Le pseudo et le port netplay se règlent dans « Jouer en ligne ».",
-                  style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w")
+                  style="Dim.TLabel").grid(row=7, column=0, columnspan=3, sticky="w")
 
         def save() -> None:
             cfg["site_url"] = site_var.get().strip() or "https://retro.kirbytrim.buzz"
             cfg["roms_dir"] = roms_var.get().strip()
             cfg["download_missing_roms"] = bool(download_var.get())
             cfg["auto_sync_saves"] = bool(auto_var.get())
+            cfg["install_dolphin_sysfiles"] = bool(sysfiles_var.get())
             cfg.setdefault("retroarch", {})
             cfg["retroarch"]["path"] = ra_var.get().strip()
             cfg["retroarch"]["cores_dir"] = cores_var.get().strip()
@@ -605,7 +611,7 @@ class LauncherApp(tk.Tk):
             self.refresh_library()
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        buttons.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         ttk.Button(buttons, text="Diagnostic…", command=self.open_doctor).pack(side="left")
         ttk.Button(buttons, text="Associer kirbyretro://",
                    command=self._install_protocol).pack(side="left", padx=8)

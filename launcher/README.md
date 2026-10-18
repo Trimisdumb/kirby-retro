@@ -11,6 +11,16 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.9.0
+
+- **Données de la console Wii importées** : les **Miis** et les **réglages** (dont la langue du système)
+  suivent de Dolphin vers le Dolphin de RetroArch — tes Miis apparaissent dans les jeux et tes
+  parties restent en français.
+- **Fichiers système Dolphin automatiques** : avant un lancement Wii/GameCube, le launcher installe
+  les fichiers système manquants (codehandler.bin…) depuis la source officielle RetroArch — plus de
+  bandeau « Core file codehandler.bin missing! ». Désactivable dans Paramètres.
+- « Importer vers RetroArch » (sauvegardes Wii) copie aussi les Miis et les réglages de la console.
+
 ## Nouveautés v1.8.2
 
 - **Correctif Linux — connexion** : le binaire autonome utilise désormais les certificats
