@@ -15,8 +15,8 @@ from . import saves as saves_mod
 from .api import fetch_library
 from .config import load_config, save_config
 from .covers import CoverManager
-from .detect import autofill, find_native
-from .launch import LaunchError, launch_game, launch_netplay
+from .detect import autofill, find_native, flatpak_native
+from .launch import LaunchError, launch_game, launch_netplay, local_rom_path
 from .music import MusicPlayer
 from .netplay import DEFAULT_PORT, candidate_addresses
 from .protocol import install_protocol
@@ -626,13 +626,19 @@ class LauncherApp(tk.Tk):
         ttk.Checkbutton(body, text="Télécharger les ROMs manquantes depuis le site",
                         variable=download_var).grid(row=5, column=0, columnspan=3,
                                                     sticky="w", pady=(10, 2))
+        auto_var = tk.BooleanVar(value=bool(cfg.get("auto_sync_saves", True)))
+        ttk.Checkbutton(body,
+                        text="Importer automatiquement les sauvegardes des émulateurs natifs au lancement",
+                        variable=auto_var).grid(row=6, column=0, columnspan=3,
+                                                sticky="w", pady=(2, 2))
         ttk.Label(body, text="Le pseudo et le port netplay se règlent dans « Jouer en ligne ».",
-                  style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w")
+                  style="Dim.TLabel").grid(row=7, column=0, columnspan=3, sticky="w")
 
         def save() -> None:
             cfg["site_url"] = site_var.get().strip() or "https://retro.kirbytrim.buzz"
             cfg["roms_dir"] = roms_var.get().strip()
             cfg["download_missing_roms"] = bool(download_var.get())
+            cfg["auto_sync_saves"] = bool(auto_var.get())
             cfg["music_file"] = music_var.get().strip()
             cfg.setdefault("retroarch", {})
             cfg["retroarch"]["path"] = ra_var.get().strip()
@@ -652,7 +658,7 @@ class LauncherApp(tk.Tk):
             self.refresh_library()
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        buttons.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         ttk.Button(buttons, text="Diagnostic…", command=self.open_doctor).pack(side="left")
         ttk.Button(buttons, text="Associer kirbyretro://",
                    command=self._install_protocol).pack(side="left", padx=8)
@@ -841,11 +847,21 @@ class LauncherApp(tk.Tk):
         title = str(game.get("title") or game.get("file") or "?")
         system = game["_system"]
         roms_dir = str(self.config_data.get("roms_dir") or "") or None
+        cores_dir = str((self.config_data.get("retroarch") or {}).get("cores_dir") or "") or None
+        rom_path: Path | None = local_rom_path(roms_dir, system, game["file"]) if roms_dir else None
+        if rom_path is not None and not rom_path.is_file():
+            rom_path = None
         win, body = self._dialog(f"Sauvegardes — {title}", 900, 620)
 
         native = find_native(system)
         native_name = Path(native).name if native else ""
-        target_dir, why = saves_mod.retroarch_save_dir()
+        if not native_name:
+            flat = flatpak_native(system)
+            native_name = flat[1] if flat else ""
+        if not native_name and system in ("wii", "gamecube"):
+            if any(root.is_dir() for _label, root in saves_mod.dolphin_roots()):
+                native_name = "Dolphin (natif)"
+        target_dir, why = saves_mod.retroarch_target_dir(system, game["file"], cores_dir=cores_dir)
 
         ttk.Label(body, text=f"Cible RetroArch : {target_dir if target_dir else '—'}").pack(anchor="w")
         ttk.Label(body, text=why, style="Dim.TLabel", wraplength=850,
@@ -859,8 +875,8 @@ class LauncherApp(tk.Tk):
         table = ttk.Treeview(wrap, columns=("source", "file", "size", "date"),
                              show="headings", selectmode="extended", height=6)
         for key, text, width, anchor in (
-            ("source", "Source", 150, "w"),
-            ("file", "Fichier", 430, "w"),
+            ("source", "Source", 210, "w"),
+            ("file", "Fichier", 370, "w"),
             ("size", "Taille", 80, "e"),
             ("date", "Date", 150, "w"),
         ):
@@ -880,14 +896,17 @@ class LauncherApp(tk.Tk):
 
         def refresh() -> None:
             table.delete(*table.get_children())
-            state["files"] = saves_mod.find_saves(system, game["file"], roms_dir)
-            home = str(Path.home())
+            state["files"] = saves_mod.find_saves(
+                system, game["file"], roms_dir, rom_path=rom_path
+            )
             for idx, save in enumerate(state["files"]):
-                shown = str(save.path).replace(home, "~", 1)
                 table.insert("", "end", iid=f"s{idx}",
-                             values=(save.source, shown, f"{save.size_ko()} Ko", save.date()))
+                             values=(save.source, save.path.name,
+                                     f"{save.size_ko()} Ko", save.date()))
             if state["files"]:
-                table.selection_set("s0")
+                best = next((i for i, save in enumerate(state["files"])
+                             if not save.source.startswith("RetroArch")), 0)
+                table.selection_set(f"s{best}")
                 show("")
             else:
                 show("Aucune sauvegarde trouvée pour ce jeu.")
@@ -906,7 +925,7 @@ class LauncherApp(tk.Tk):
                 show("Sélectionne d'abord une sauvegarde dans la liste.", DANGER)
                 return
             try:
-                show(saves_mod.import_to_retroarch(system, game["file"], files), OK)
+                show(saves_mod.import_to_retroarch(system, game["file"], files, cores_dir=cores_dir), OK)
             except saves_mod.SaveError as exc:
                 show(str(exc), DANGER)
             except Exception as exc:  # noqa: BLE001
@@ -967,8 +986,9 @@ class LauncherApp(tk.Tk):
         ttk.Button(row, text="Choisir un fichier…", command=do_choose).pack(side="left")
         ttk.Button(row, text="Actualiser", command=refresh).pack(side="right")
         ttk.Label(body,
-                  text="Seules les sauvegardes de jeu se transfèrent entre émulateurs, pas les états "
-                       "(savestates). Chaque copie garde l'ancienne version en .bak.",
+                  text="Sauvegardes de jeu uniquement (pas les savestates). Chaque copie garde "
+                       "l'ancienne version en .bak ; au lancement, la plus récente est importée "
+                       "automatiquement (option dans Paramètres).",
                   style="Dim.TLabel", wraplength=850, justify="left").pack(anchor="w", pady=(8, 0))
         refresh()
 

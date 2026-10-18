@@ -43,6 +43,7 @@ def default_config() -> dict[str, Any]:
         "site_url": "https://retro.kirbytrim.buzz",
         "roms_dir": "",
         "download_missing_roms": True,
+        "auto_sync_saves": True,
         "retroarch": {"path": "", "cores_dir": ""},
         "emulators": {},
         "prefer_native_for": ["nds", "n64", "psx"],

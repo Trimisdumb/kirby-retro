@@ -1,21 +1,25 @@
 """Trouver et copier les sauvegardes de jeu entre émulateurs et RetroArch.
 
-RetroArch lit un fichier .srm par jeu, nommé comme la ROM. Les émulateurs
-natifs écrivent d'autres formats (melonDS en .sav, DeSmuME en .dsv, N64 en
-.eep/.sra/.fla/.mpk...) : on convertit ici au moment de la copie.
+RetroArch peut ranger ses sauvegardes par core (« saves/melonDS DS/… ») ou
+les regrouper dans « saves/ ». Les émulateurs natifs écrivent d'autres
+formats : melonDS en .sav, DeSmuME en .dsv, N64 en .eep/.sra/.fla/.mpk,
+Dolphin en dossiers de titre (NAND Wii). On convertit au moment de la copie.
 
-Avant d'écraser une sauvegarde existante, elle est recopiée en .bak-<date>.
+Au lancement, la sauvegarde la plus récente gagne (native → RetroArch ou
+l'inverse) ; chaque écrasement garde l'ancienne version en .bak-<date>.
 """
 from __future__ import annotations
 
 import datetime as _dt
 import os
+import re
 import shutil
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .detect import retroarch_cfg_candidates
+from .detect import resolve_core_path, retroarch_cfg_candidates
 
 # Tailles possibles d'une sauvegarde DS (128 Ko à 2 Mo, et les petites cartes
 # de jeux GBA/GB). Sert à reconnaître un .dsv brut derrière son en-tête.
@@ -56,6 +60,93 @@ _KIND_BY_EXT = {
 
 RETROARCH_EXT = "srm"
 
+# Extensions que RetroArch (et ses cores) utilisent pour les sauvegardes.
+RA_SAVE_EXTS = (".srm", ".sav", ".dsv", ".eep", ".sra", ".fla", ".mpk", ".mcd", ".mcr")
+
+# Noms de dossiers « par core » de RetroArch (retroarch.cfg → sort_savefiles).
+_CORE_FOLDER_HINTS: dict[str, tuple[str, ...]] = {
+    "nes": ("Mesen2", "FCEUmm", "Nestopia UE", "Mesen-S"),
+    "snes": ("Snes9x", "bsnes", "Mesen-S"),
+    "gb": ("Gambatte", "SameBoy", "Gearboy"),
+    "gba": ("mGBA", "VBA-M", "gpSP"),
+    "n64": ("Mupen64Plus-Next", "ParaLLEl N64"),
+    "nds": ("melonDS DS", "melonDS", "DeSmuME", "DeSmuME 2015"),
+    "psx": ("SwanStation", "PCSX-ReARmed", "Beetle PSX", "Beetle PSX HW"),
+    "psp": ("PPSSPP",),
+    "dreamcast": ("Flycast",),
+    "segaMD": ("Genesis Plus GX", "PicoDrive"),
+    "segaMS": ("Genesis Plus GX", "PicoDrive"),
+    "segaGG": ("Genesis Plus GX", "PicoDrive"),
+    "segaCD": ("Genesis Plus GX", "PicoDrive"),
+    "sega32x": ("PicoDrive",),
+    "segaSaturn": ("Beetle Saturn", "Kronos"),
+    "atari2600": ("Stella 2014", "Stella"),
+    "pce": ("Beetle PCE", "Beetle PCE Fast", "Beetle SuperGrafx"),
+    "lynx": ("Beetle Lynx", "Handy"),
+    "c64": ("VICE x64sc",),
+    "vb": ("Beetle VB",),
+    "cpc": ("Caprice32", "CrocoDS"),
+    "apple2": ("AppleWin",),
+    "pc88": ("QUASI88",),
+    "pokemini": ("PokeMini",),
+    "arcade": ("FBNeo",),
+    "3ds": ("Azahar",),
+}
+
+# Nom de dossier quand le .info du core n'est pas disponible (Flatpak).
+_CORE_DISPLAY = {
+    "melondsds": "melonDS DS",
+    "melonds": "melonDS",
+    "desmume": "DeSmuME",
+    "desmume2015": "DeSmuME 2015",
+    "mupen64plus_next": "Mupen64Plus-Next",
+    "parallel_n64": "ParaLLEl N64",
+    "mesen2": "Mesen2",
+    "mesen-s": "Mesen-S",
+    "fceumm": "FCEUmm",
+    "nestopia": "Nestopia UE",
+    "snes9x": "Snes9x",
+    "bsnes": "bsnes",
+    "gambatte": "Gambatte",
+    "sameboy": "SameBoy",
+    "gearboy": "Gearboy",
+    "mgba": "mGBA",
+    "gpsp": "gpSP",
+    "vba_next": "VBA-M",
+    "genesis_plus_gx": "Genesis Plus GX",
+    "picodrive": "PicoDrive",
+    "swanstation": "SwanStation",
+    "pcsx_rearmed": "PCSX-ReARmed",
+    "mednafen_psx": "Beetle PSX",
+    "mednafen_psx_hw": "Beetle PSX HW",
+    "flycast": "Flycast",
+    "ppsspp": "PPSSPP",
+    "dolphin": "dolphin-emu",
+    "stella2014": "Stella 2014",
+    "stella": "Stella",
+    "handy": "Handy",
+    "mednafen_lynx": "Beetle Lynx",
+    "vice_x64sc": "VICE x64sc",
+    "mednafen_saturn": "Beetle Saturn",
+    "kronos": "Kronos",
+    "mednafen_pce": "Beetle PCE",
+    "mednafen_pce_fast": "Beetle PCE Fast",
+    "mednafen_supergrafx": "Beetle SuperGrafx",
+    "mednafen_vb": "Beetle VB",
+    "beetle_vb": "Beetle VB",
+    "fbneo": "FBNeo",
+    "cap32": "Caprice32",
+    "crocods": "CrocoDS",
+    "applewin": "AppleWin",
+    "quasi88": "QUASI88",
+    "pokemini": "PokeMini",
+    "azahar": "Azahar",
+    "citra2018": "Citra",
+    "citra": "Citra",
+}
+
+_CODE_OK = re.compile(r"^[A-Z0-9]{6}$")
+
 
 class SaveError(Exception):
     """Erreur à afficher telle quelle dans l'interface."""
@@ -73,27 +164,66 @@ class SaveFile:
         path = Path(path).expanduser()
         return cls(path, source, _KIND_BY_EXT.get(path.suffix.lower(), "raw"), system)
 
+    def _dir_totals(self) -> tuple[int, float]:
+        size, latest = 0, 0.0
+        for item in self.path.rglob("*"):
+            try:
+                if item.is_file():
+                    info = item.stat()
+                    size += info.st_size
+                    latest = max(latest, info.st_mtime)
+            except OSError:
+                continue
+        return size, latest
+
     def size_ko(self) -> int:
+        if self.path.is_dir():
+            size, _ = self._dir_totals()
+            return max(1, size // 1024)
         try:
             return max(1, self.path.stat().st_size // 1024)
         except OSError:
             return 0
 
     def date(self) -> str:
-        try:
-            stamp = _dt.datetime.fromtimestamp(self.path.stat().st_mtime)
-            return stamp.strftime("%d/%m/%Y %H:%M")
-        except OSError:
+        mtime = self.mtime()
+        if not mtime:
             return "?"
+        stamp = _dt.datetime.fromtimestamp(mtime)
+        return stamp.strftime("%d/%m/%Y %H:%M")
 
     def mtime(self) -> float:
+        if self.path.is_dir():
+            _, latest = self._dir_totals()
+            return latest
         try:
             return self.path.stat().st_mtime
         except OSError:
             return 0.0
 
 
+# ---------------------------------------------------------------------------
 # dossier de sauvegardes de RetroArch
+
+def _retroarch_cfg(cfg_candidates: list[Path] | None = None) -> tuple[Path | None, str]:
+    """Premier retroarch.cfg trouvé et son contenu."""
+    for cfg in cfg_candidates if cfg_candidates is not None else retroarch_cfg_candidates():
+        if cfg.is_file():
+            try:
+                return cfg, cfg.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+    return None, ""
+
+
+def _cfg_flag(text: str, key: str) -> bool:
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith(key):
+            _, _, value = line.partition("=")
+            return value.strip().strip('"').lower() in ("true", "1", "yes")
+    return False
+
 
 def _resolve_retroarch_path(value: str, base: Path) -> Path | None:
     """Interprète une valeur de retroarch.cfg ("default", ":/chemin", "~/...")."""
@@ -110,19 +240,15 @@ def _resolve_retroarch_path(value: str, base: Path) -> Path | None:
 
 def retroarch_save_dir(cfg_candidates: list[Path] | None = None) -> tuple[Path | None, str]:
     """Dossier des sauvegardes de RetroArch, avec une explication lisible."""
-    for cfg in cfg_candidates if cfg_candidates is not None else retroarch_cfg_candidates():
-        if not cfg.is_file():
-            continue
+    cfg, text = _retroarch_cfg(cfg_candidates)
+    if cfg is not None:
         value: str | None = None
-        try:
-            for line in cfg.read_text(encoding="utf-8", errors="replace").splitlines():
-                line = line.strip()
-                if line.startswith("savefile_directory"):
-                    _, _, value = line.partition("=")
-                    value = value.strip().strip('"').strip("'")
-                    break
-        except OSError:
-            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("savefile_directory"):
+                _, _, value = line.partition("=")
+                value = value.strip().strip('"').strip("'")
+                break
         resolved = _resolve_retroarch_path(value or "default", cfg.parent)
         if resolved is not None:
             return resolved, f"retroarch.cfg ({cfg}) → savefile_directory"
@@ -141,6 +267,198 @@ def retroarch_save_dir(cfg_candidates: list[Path] | None = None) -> tuple[Path |
     return None, "RetroArch introuvable — règle-le dans Paramètres, ou exporte une copie"
 
 
+def _ra_search_dirs(base: Path) -> list[Path]:
+    """« saves/ » puis ses sous-dossiers « par core » (melonDS DS, Mesen2…)."""
+    out = [base]
+    try:
+        for item in sorted(base.iterdir()):
+            if item.is_dir() and item.name != "dolphin-emu":
+                out.append(item)
+    except OSError:
+        pass
+    return out
+
+
+def _core_display_name(core: str | Path) -> str | None:
+    """Nom de dossier du core (display_name du .info, sinon table connue)."""
+    path = Path(core)
+    try:
+        text = path.with_suffix(".info").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        text = ""
+    for line in text.splitlines():
+        if line.startswith("display_name"):
+            _, _, value = line.partition("=")
+            value = value.strip().strip('"')
+            if value:
+                return value
+    stem = path.stem
+    if stem.endswith("_libretro"):
+        stem = stem[: -len("_libretro")]
+    return _CORE_DISPLAY.get(stem)
+
+
+def retroarch_target_dir(
+    system: str,
+    file: str,
+    cfg_candidates: list[Path] | None = None,
+    cores_dir: str | None = None,
+) -> tuple[Path | None, str]:
+    """Dossier exact où RetroArch lira la sauvegarde (gère « trier par core »)."""
+    base, why = retroarch_save_dir(cfg_candidates)
+    if base is None:
+        return None, why
+    stem = Path(file).stem
+    cfg, text = _retroarch_cfg(cfg_candidates)
+    sort = cfg is not None and _cfg_flag(text, "sort_savefiles_enable")
+    subdirs = _ra_search_dirs(base)[1:]
+    order = [*subdirs, base] if sort else [base, *subdirs]
+    for folder in order:
+        for ext in RA_SAVE_EXTS:
+            if (folder / (stem + ext)).is_file():
+                name = "saves" if folder == base else folder.name
+                return folder, f"sauvegarde existante dans « {name} »"
+    if not sort:
+        return base, why
+    by_content = _cfg_flag(text, "sort_savefiles_by_content_enable")
+    hints = _CORE_FOLDER_HINTS.get(system, ())
+    existing = [folder.name for folder in subdirs if folder.name in hints]
+    name: str | None = None
+    core = resolve_core_path(cores_dir, system) if cores_dir else None
+    if core:
+        display = _core_display_name(core)
+        if display and (not existing or display in existing):
+            name = display
+    if not name and existing:
+        name = existing[0]
+    if name:
+        target = base / name / stem if by_content else base / name
+        return target, f"tri par core activé ({name})"
+    return base, why
+
+
+# ---------------------------------------------------------------------------
+# Dolphin (NAND Wii) : les sauvegardes Wii sont des dossiers par jeu
+
+def dolphin_roots() -> list[tuple[str, Path]]:
+    home = Path.home()
+    return [
+        ("Dolphin", home / ".local/share/dolphin-emu"),
+        ("Dolphin", home / ".dolphin-emu"),
+        ("Dolphin (Flatpak)", home / ".var/app/org.DolphinEmu.dolphin-emu/data/dolphin-emu"),
+    ]
+
+
+def retroarch_dolphin_dir(cfg_candidates: list[Path] | None = None) -> Path | None:
+    """Dossier « User » du Dolphin intégré à RetroArch (NAND Wii, mémoires GC)."""
+    base, _why = retroarch_save_dir(cfg_candidates)
+    if base is None:
+        return None
+    if base.is_dir():
+        for sub in _ra_search_dirs(base):
+            user = sub / "User"
+            if (user / "Wii").is_dir() or (user / "GC").is_dir():
+                return user
+    return base / "dolphin-emu" / "User"
+
+
+def _dolphin_title_roots(
+    cfg_candidates: list[Path] | None = None, system: str = "wii"
+) -> list[tuple[str, Path]]:
+    sub = "Wii/title/00010000" if system == "wii" else "GC"
+    out = [(label, root / sub) for label, root in dolphin_roots()]
+    ra_user = retroarch_dolphin_dir(cfg_candidates)
+    if ra_user is not None:
+        out.append(("RetroArch (Dolphin)", ra_user / sub))
+    return out
+
+
+def wii_game_code(rom_path: Path | str | None) -> str | None:
+    """Code du jeu Wii (« RSPE01 ») lu dans la ROM (.iso/.wbfs/.rvz, même en .zip)."""
+    if not rom_path:
+        return None
+    path = Path(rom_path)
+    if not path.is_file():
+        return None
+    try:
+        if path.suffix.lower() == ".zip":
+            with zipfile.ZipFile(path) as archive:
+                members = [name for name in archive.namelist() if not name.endswith("/")]
+                if not members:
+                    return None
+                with archive.open(members[0]) as handle:
+                    return _code_from_stream(handle, Path(members[0]).suffix.lower())
+        with path.open("rb") as handle:
+            return _code_from_stream(handle, path.suffix.lower())
+    except (OSError, zipfile.BadZipFile, EOFError):
+        return None
+
+
+def _code_from_stream(handle, ext: str) -> str | None:
+    if ext == ".wbfs":
+        head = handle.read(16)
+        if len(head) < 12 or head[:4] != b"WBFS":
+            return None
+        shift = head[9]
+        if not 1 <= shift <= 25:
+            return None
+        handle.seek(1 << shift)
+        return _clean_code(handle.read(6))
+    if ext == ".rvz":
+        handle.seek(0x10)
+        code = _clean_code(handle.read(6))
+        if code:
+            return code
+        handle.seek(0)
+    return _clean_code(handle.read(6))
+
+
+def _clean_code(data: bytes) -> str | None:
+    try:
+        text = data.decode("ascii")
+    except UnicodeDecodeError:
+        return None
+    return text if _CODE_OK.match(text) else None
+
+
+def _title_label(name: str) -> str:
+    """« 52484150 » → « RHAP » pour l'affichage."""
+    try:
+        text = bytes.fromhex(name).decode("ascii")
+    except (ValueError, UnicodeDecodeError):
+        return name
+    return text if text.isprintable() and 3 <= len(text) <= 6 else name
+
+
+def _find_dolphin_saves(
+    system: str,
+    cfg_candidates: list[Path] | None = None,
+    rom_path: Path | str | None = None,
+) -> list[SaveFile]:
+    if system != "wii":
+        return []
+    code = wii_game_code(rom_path)
+    # Dolphin nomme les dossiers de titre en hexadécimal : « RHAP01 » → « 52484150 ».
+    want = code[:4].encode("ascii").hex().upper() if code else None
+    found: list[SaveFile] = []
+    for label, titles in _dolphin_title_roots(cfg_candidates, system):
+        if not titles.is_dir():
+            continue
+        try:
+            entries = sorted(item for item in titles.iterdir() if item.is_dir())
+        except OSError:
+            continue
+        for entry in entries:
+            if want and entry.name.upper() != want:
+                continue
+            found.append(
+                SaveFile(entry, f"{label} · {_title_label(entry.name)}", "dolphin-title", system)
+            )
+    found.sort(key=lambda save: save.mtime(), reverse=True)
+    return found
+
+
+# ---------------------------------------------------------------------------
 # emplacements des émulateurs natifs
 
 def _candidate_dirs(
@@ -180,6 +498,9 @@ def _candidate_dirs(
         add("mGBA (à côté de la ROM)", rom_sys, (".sav",))
         add("mGBA (dossier saves)", home / ".local/share/mgba/saves", (".sav",))
         add("VisualBoyAdvance", home / ".config/vba", (".sav",))
+    elif system == "nes":
+        add("FCEUX", home / ".fceux/sav", (".sav",))
+        add("Mesen2", home / ".local/share/Mesen2/Saves", (".srm", ".sav"))
     else:
         add("émulateur (à côté de la ROM)", rom_sys, (".sav", ".srm"))
 
@@ -192,7 +513,9 @@ def _candidate_dirs(
 
     ra_dir, _why = retroarch_save_dir(cfg_candidates)
     if ra_dir is not None:
-        add("RetroArch", ra_dir, (".srm",))
+        add("RetroArch", ra_dir, RA_SAVE_EXTS)
+        for sub in _ra_search_dirs(ra_dir)[1:]:
+            add(f"RetroArch ({sub.name})", sub, RA_SAVE_EXTS)
 
     add(
         "à côté de la ROM",
@@ -207,8 +530,11 @@ def find_saves(
     file: str,
     roms_dir: str | None = None,
     cfg_candidates: list[Path] | None = None,
+    rom_path: Path | str | None = None,
 ) -> list[SaveFile]:
-    """Sauvegardes trouvées pour ce jeu, les plus récentes d'abord."""
+    """Sauvegardes trouvées pour ce jeu (RetroArch par core + natifs), récentes d'abord."""
+    if system in ("wii", "gamecube"):
+        return _find_dolphin_saves(system, cfg_candidates, rom_path)
     stem = Path(file).stem
     found: list[SaveFile] = []
     seen: set[Path] = set()
@@ -230,6 +556,7 @@ def find_saves(
     return found
 
 
+# ---------------------------------------------------------------------------
 # conversions
 
 def _strip_dsv(data: bytes) -> tuple[bytes | None, str]:
@@ -282,21 +609,69 @@ def backup_existing(dest: Path) -> Path | None:
     return bak
 
 
+def _backup_dir(dest: Path) -> Path | None:
+    """Copie un dossier de sauvegarde (Wii) déjà en place avant de l'écraser."""
+    if not dest.is_dir():
+        return None
+    stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    bak = dest.with_name(f"{dest.name}.bak-{stamp}")
+    if bak.exists():
+        shutil.rmtree(bak, ignore_errors=True)
+    shutil.copytree(dest, bak)
+    return bak
+
+
+def _copy_dolphin_title(
+    source: SaveFile,
+    *,
+    to_retroarch: bool,
+    cfg_candidates: list[Path] | None = None,
+) -> str:
+    """Copie un dossier de sauvegarde Wii entre Dolphin natif et RetroArch."""
+    code = source.path.name
+    if to_retroarch:
+        user_dir = retroarch_dolphin_dir(cfg_candidates)
+        if user_dir is None:
+            raise SaveError("Dossier Dolphin de RetroArch introuvable")
+        label = "RetroArch"
+    else:
+        user_dir = next((root for _label, root in dolphin_roots() if root.is_dir()), None)
+        if user_dir is None:
+            raise SaveError("Dolphin (natif) introuvable — exporte une copie à la place")
+        label = "Dolphin"
+    dest = user_dir / "Wii/title/00010000" / code
+    note = ""
+    if dest.exists():
+        bak = _backup_dir(dest)
+        if bak is not None:
+            shutil.rmtree(dest)
+            note = f" — ancienne version copiée en {bak.name}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source.path, dest)
+    return f"{label} : sauvegarde Wii {code} copiée vers {dest}{note}"
+
+
 def import_to_retroarch(
     system: str,
     file: str,
     sources: list[SaveFile],
     cfg_candidates: list[Path] | None = None,
+    cores_dir: str | None = None,
 ) -> str:
-    """Écrit la sauvegarde au format RetroArch et renvoie un message lisible."""
-    ra_dir, why = retroarch_save_dir(cfg_candidates)
-    if ra_dir is None:
+    """Écrit la sauvegarde là où RetroArch la lira, avec copie de secours."""
+    if not sources:
+        raise SaveError("aucune sauvegarde sélectionnée")
+    source = sources[0]
+    if source.kind == "dolphin-title":
+        return _copy_dolphin_title(source, to_retroarch=True, cfg_candidates=cfg_candidates)
+    target_dir, why = retroarch_target_dir(system, file, cfg_candidates, cores_dir)
+    if target_dir is None:
         raise SaveError(why)
     data, note = to_retroarch_bytes(sources)
     if data is None:
         raise SaveError(note)
-    dest = ra_dir / (Path(file).stem + "." + RETROARCH_EXT)
-    ra_dir.mkdir(parents=True, exist_ok=True)
+    dest = target_dir / (Path(file).stem + "." + RETROARCH_EXT)
+    target_dir.mkdir(parents=True, exist_ok=True)
     bak = backup_existing(dest)
     dest.write_bytes(data)
     message = f"RetroArch : écrit {dest} ({note})"
@@ -365,6 +740,8 @@ def import_to_native(
     roms_dir: str | None = None,
 ) -> str:
     """Copie une sauvegarde vers l'émulateur natif et renvoie un message lisible."""
+    if source.kind == "dolphin-title":
+        return _copy_dolphin_title(source, to_retroarch=False)
     targets = native_targets(system, file, roms_dir)
     if not targets:
         raise SaveError("Aucun emplacement d'émulateur natif trouvé — exporte une copie à la place")
@@ -401,5 +778,53 @@ def export_copy(source: SaveFile, dest: Path) -> Path:
     """Copie la sauvegarde vers un fichier choisi par l'utilisateur."""
     dest = Path(dest).expanduser()
     dest.parent.mkdir(parents=True, exist_ok=True)
+    if source.path.is_dir():
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(source.path, dest)
+        return dest
     shutil.copy2(source.path, dest)
     return dest
+
+
+# ---------------------------------------------------------------------------
+# synchronisation au lancement
+
+def auto_sync_before_launch(
+    config: dict,
+    system: str,
+    file: str,
+    rom_path: Path | str | None = None,
+    to_retroarch: bool = True,
+    cfg_candidates: list[Path] | None = None,
+) -> str | None:
+    """Avant un lancement : la sauvegarde la plus récente gagne.
+
+    native → RetroArch (ou l'inverse), avec copie de secours. Ne bloque jamais
+    le lancement : en cas de problème, on continue sans rien dire.
+    """
+    if not config.get("auto_sync_saves", True):
+        return None
+    try:
+        roms_dir = (config.get("roms_dir") or "").strip() or None
+        cores_dir = str((config.get("retroarch") or {}).get("cores_dir") or "") or None
+        saves = find_saves(system, file, roms_dir, cfg_candidates, rom_path=rom_path)
+        natives = [save for save in saves if not save.source.startswith("RetroArch")]
+        retro = [save for save in saves if save.source.startswith("RetroArch")]
+        if to_retroarch:
+            if not natives:
+                return None
+            if retro and retro[0].mtime() >= natives[0].mtime():
+                return None
+            import_to_retroarch(
+                system, file, natives, cfg_candidates=cfg_candidates, cores_dir=cores_dir
+            )
+            return f"Sauvegarde importée vers RetroArch ({natives[0].source})"
+        if not retro:
+            return None
+        if natives and natives[0].mtime() >= retro[0].mtime():
+            return None
+        import_to_native(system, file, retro[0], roms_dir=roms_dir)
+        return "Sauvegarde RetroArch exportée vers l'émulateur natif"
+    except Exception:  # noqa: BLE001
+        return None

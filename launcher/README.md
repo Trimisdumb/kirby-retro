@@ -11,6 +11,12 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.8.0
+
+- **Sauvegardes trouvées automatiquement, partout** : RetroArch (y compris ses dossiers « par core » — `saves/melonDS DS/…`, `saves/Mupen64Plus-Next/…`, NAND de Dolphin) **et** les émulateurs natifs installés (melonDS, Dolphin flatpak/dossier, simple64, mupen64plus, DuckStation, FCEUX…). La liste indique la provenance de chaque sauvegarde.
+- **Import automatique au lancement** : avant de démarrer un jeu, la sauvegarde la plus récente est copiée dans l'émulateur utilisé (natif → RetroArch, ou l'inverse), l'ancienne version étant gardée en `.bak-<date>`. Désactivable dans **Paramètres**.
+- **Sauvegardes Wii** : les dossiers de titre Dolphin (NAND) se copient entre Dolphin natif et RetroArch, le jeu étant identifié par le code lu dans la ROM.
+
 ## Nouveautés v1.7.0
 
 - **Interface repensée, plus sobre** : fenêtre classique (barre de titre, redimensionnable), **barre de menus** (Fichier, Émulation, Options, Affichage, Aide), **barre d'outils** (Démarrer, En ligne, Sauvegardes, Rafraîchir, Paramètres), **liste de jeux** avec bannières, tri par colonne, filtre par console et **barre d'état**. Les polices pixel et les effets néon sont retirés.
@@ -112,11 +118,13 @@ Notes :
 
 ## Sauvegardes
 
-Le bouton **SAUVEGARDES** (ou clic droit sur un jeu) liste les sauvegardes trouvées pour ce jeu, puis :
+Le bouton **SAUVEGARDES** (ou clic droit sur un jeu) liste les sauvegardes trouvées pour ce jeu — dans RetroArch (dossier de `retroarch.cfg` **et** sous-dossiers « par core ») et chez les émulateurs natifs — puis :
 
-- **IMPORTER VERS RETROARCH** — écrit le `.srm` au bon endroit (dossier lu dans `retroarch.cfg`). Plusieurs fichiers sélectionnés (N64 : .eep/.sra/.fla/.mpk) sont fusionnés dans l’ordre attendu.
-- **VERS …** — copie vers l’émulateur natif détecté (melonDS, simple64, DuckStation…), en redécoupant un `.srm` N64 si besoin.
+- **IMPORTER VERS RETROARCH** — écrit le `.srm` au bon endroit (dossier de `retroarch.cfg`, en respectant « trier les sauvegardes par core »). Plusieurs fichiers sélectionnés (N64 : .eep/.sra/.fla/.mpk) sont fusionnés dans l’ordre attendu.
+- **VERS …** — copie vers l’émulateur natif détecté (melonDS, Dolphin, simple64, DuckStation…), en redécoupant un `.srm` N64 si besoin.
 - **EXPORTER UNE COPIE** / **CHOISIR UN FICHIER** — pour passer par un fichier (export du navigateur, sauvegarde d’un autre PC…).
+
+Au lancement d’un jeu, la sauvegarde la plus récente est importée automatiquement dans l’émulateur utilisé (natif → RetroArch ou l’inverse ; option dans **Paramètres**). Les sauvegardes Wii sont des dossiers de titre Dolphin : ils se copient tels quels entre Dolphin natif et RetroArch, le jeu étant identifié par le code lu dans la ROM.
 
 Conversions automatiques : `.dsv` DeSmuME → sauvegarde brute DS, `.eep`/`.sra`/`.fla`/`.mpk` ↔ `.srm` N64. Ça ne concerne que les sauvegardes de jeu (pas les savestates). Avant chaque écriture, la version en place est gardée en `.bak-<date>`.
 

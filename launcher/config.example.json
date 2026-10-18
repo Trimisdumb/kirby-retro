@@ -2,6 +2,7 @@
   "site_url": "https://retro.kirbytrim.buzz",
   "roms_dir": "",
   "download_missing_roms": true,
+  "auto_sync_saves": true,
   "retroarch": {
     "path": "",
     "cores_dir": ""

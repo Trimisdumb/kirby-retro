@@ -262,6 +262,38 @@ def find_native(system_id: str) -> str | None:
     return None
 
 
+# Émulateurs natifs installés en Flatpak (Linux) : app id → nom lisible.
+FLATPAK_NATIVE: dict[str, tuple[str, str]] = {
+    "nds": ("net.kuribo64.melonDS", "melonDS (Flatpak)"),
+    "wii": ("org.DolphinEmu.dolphin-emu", "Dolphin (Flatpak)"),
+    "gamecube": ("org.DolphinEmu.dolphin-emu", "Dolphin (Flatpak)"),
+    "gba": ("io.mgba.mGBA", "mGBA (Flatpak)"),
+    "gb": ("io.mgba.mGBA", "mGBA (Flatpak)"),
+    "psx": ("org.duckstation.DuckStation", "DuckStation (Flatpak)"),
+    "ps2": ("net.pcsx2.PCSX2", "PCSX2 (Flatpak)"),
+    "psp": ("org.ppsspp.PPSSPP", "PPSSPP (Flatpak)"),
+    "dreamcast": ("org.flycast.Flycast", "Flycast (Flatpak)"),
+    "snes": ("com.snes9x.Snes9x", "Snes9x (Flatpak)"),
+}
+
+
+def _flatpak_app_installed(app_id: str) -> bool:
+    if sys.platform in ("win32", "darwin"):
+        return False
+    return (Path.home() / ".var/app" / app_id).is_dir() or (
+        Path("/var/lib/flatpak/app") / app_id
+    ).is_dir()
+
+
+def flatpak_native(system_id: str) -> tuple[str, str] | None:
+    """Émulateur natif installé en Flatpak : (app id, nom lisible)."""
+    entry = FLATPAK_NATIVE.get(system_id)
+    if not entry:
+        return None
+    app_id, label = entry
+    return (app_id, label) if _flatpak_app_installed(app_id) else None
+
+
 def autofill(config: dict) -> dict:
     """Complète path RetroArch / cores / natifs si vides."""
     # Dossier ROMs par défaut : rien à configurer, les jeux manquants se

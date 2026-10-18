@@ -11,6 +11,7 @@ from .api import download_rom
 from .cores import RETROARCH_CORES
 from .detect import cores_dirs, is_flatpak, resolve_core_path, retroarch_executable_ok
 from .netplay import DEFAULT_PORT as NETPLAY_DEFAULT_PORT, write_appendconfig
+from .saves import auto_sync_before_launch
 
 
 class LaunchError(Exception):
@@ -68,12 +69,21 @@ def _run(cmd: list[str], cwd: str | None = None) -> None:
         raise LaunchError(f"Impossible de lancer :\n{' '.join(cmd)}\n{exc}") from exc
 
 
-def launch_native(config: dict[str, Any], system: str, rom: Path) -> bool:
+def launch_native(
+    config: dict[str, Any],
+    system: str,
+    rom: Path,
+    *,
+    progress: callable | None = None,
+) -> bool:
     """Tente un émulateur standalone. Retourne True si lancé."""
     entry = (config.get("emulators") or {}).get(system) or {}
     path = (entry.get("path") or "").strip()
     if not path or not Path(path).exists():
         return False
+    note = auto_sync_before_launch(config, system, rom.name, rom_path=rom, to_retroarch=False)
+    if note and progress:
+        progress(note)
     args = entry.get("args") or ["{rom}"]
     cmd = [path]
     for a in args:
@@ -107,12 +117,21 @@ def _resolve_core(ra: dict[str, Any], system: str) -> str:
     )
 
 
-def launch_retroarch(config: dict[str, Any], system: str, rom: Path) -> bool:
+def launch_retroarch(
+    config: dict[str, Any],
+    system: str,
+    rom: Path,
+    *,
+    progress: callable | None = None,
+) -> bool:
     ra = config.get("retroarch") or {}
     ra_path = (ra.get("path") or "").strip()
     if not retroarch_executable_ok(ra_path):
         return False
     core = _resolve_core(ra, system)
+    note = auto_sync_before_launch(config, system, rom.name, rom_path=rom, to_retroarch=True)
+    if note and progress:
+        progress(note)
     cmd = retroarch_command(ra_path) + ["-L", core, str(rom)]
     cwd = None if is_flatpak(ra_path) else str(Path(ra_path).parent)
     _run(cmd, cwd=cwd)
@@ -145,6 +164,9 @@ def launch_netplay(
             "Installe RetroArch (Paramètres → Diagnostic pour vérifier), puis réessaie."
         )
     core = _resolve_core(ra, system)
+    note = auto_sync_before_launch(config, system, file, rom_path=rom, to_retroarch=True)
+    if note and progress:
+        progress(note)
 
     try:
         port = int(port)
@@ -195,7 +217,7 @@ def launch_game(
 
     def try_native() -> bool:
         try:
-            if launch_native(config, system, rom):
+            if launch_native(config, system, rom, progress=progress):
                 return True
         except LaunchError as exc:
             errors.append(str(exc))
@@ -203,7 +225,7 @@ def launch_game(
 
     def try_ra() -> bool:
         try:
-            if launch_retroarch(config, system, rom):
+            if launch_retroarch(config, system, rom, progress=progress):
                 return True
         except LaunchError as exc:
             errors.append(str(exc))

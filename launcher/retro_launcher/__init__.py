@@ -1,2 +1,2 @@
 """Launcher natif multi-plateforme pour retro.kirbytrim.buzz."""
-__version__ = "1.7.0"
+__version__ = "1.8.0"
