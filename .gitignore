@@ -8,9 +8,8 @@ covers/
 state/
 data/
 
-# Archives du launcher : reconstruites depuis launcher/ (voir README)
-public/downloads/*.zip
-public/downloads/*.tar.gz
+# Archives du launcher : construites au déploiement, jamais versionnées (voir README)
+public/downloads/
 
 # Python
 __pycache__/
