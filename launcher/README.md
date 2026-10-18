@@ -11,6 +11,11 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.7.0
+
+- **Interface repensée, plus sobre** : fenêtre classique (barre de titre, redimensionnable), **barre de menus** (Fichier, Émulation, Options, Affichage, Aide), **barre d'outils** (Démarrer, En ligne, Sauvegardes, Rafraîchir, Paramètres), **liste de jeux** avec bannières, tri par colonne, filtre par console et **barre d'état**. Les polices pixel et les effets néon sont retirés.
+- La chiptune, le netplay, les sauvegardes et le téléchargement automatique des ROMs restent inchangés.
+
 ## Nouveautés v1.6.0
 
 - **Sauvegardes entre émulateurs** : nouveau bouton **SAUVEGARDES** (aussi dans le clic droit) — le launcher liste les sauvegardes de jeu qu’il trouve, puis **IMPORTER VERS RETROARCH**, **VERS** l’émulateur natif, **EXPORTER UNE COPIE** ou **CHOISIR UN FICHIER** (export du navigateur, autre émulateur…). Conversion au passage : les .dsv DeSmuME perdent leur en-tête, les fichiers N64 (.eep/.sra/.fla/.mpk) sont fusionnés dans le .srm attendu par RetroArch — et inversement.
@@ -226,6 +231,6 @@ L’émulation DS/N64 dans le navigateur (WASM) reste limitée. Un launcher nati
 
 ## Crédits
 
-- Polices pixel : **Press Start 2P** © CodeMan38 et **VT323** © Peter Hull — [SIL Open Font License 1.1](https://openfontlicense.org) (licence fournie dans `retro_launcher/assets/fonts/OFL.txt`).
-- Chiptune : boucle 8-bit **générée localement** par le launcher (aucun fichier audio téléchargé, aucun son si le bouton MUSIQUE est coupé).
+- Code du site et du launcher : licence **MIT** — sources sur [github.com/Trimisdumb/kirby-retro](https://github.com/Trimisdumb/kirby-retro).
+- Chiptune : boucle 8-bit **générée localement** par le launcher (aucun fichier audio téléchargé ; s'active ou se coupe dans **Options → Musique**).
 - Jaquettes : récupérées de ton site et mises en cache dans `~/.cache/KirbyRetroLauncher/covers/` — rien n’est envoyé ailleurs.

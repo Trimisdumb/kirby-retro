@@ -1,18 +1,13 @@
-"""Interface Tkinter du launcher : cartes avec jaquettes, chiptune, netplay.
-
-Habillage rétro : fenêtre sans bordure, dégradé violet/orangé avec scanlines,
-polices pixel, recherche et filtres par console.
-"""
+"""Interface Tkinter du launcher : liste de jeux, RetroArch, netplay, sauvegardes."""
 from __future__ import annotations
 
 import math
 import threading
 import tkinter as tk
-import tkinter.font as tkfont
 import unicodedata
 from pathlib import Path
 from queue import Empty
-from tkinter import ttk
+from tkinter import filedialog, ttk
 from typing import Any
 
 from . import __version__
@@ -25,63 +20,20 @@ from .launch import LaunchError, launch_game, launch_netplay
 from .music import MusicPlayer
 from .netplay import DEFAULT_PORT, candidate_addresses
 from .protocol import install_protocol
-from .theme import (
-    BG_DARK,
-    BG_DEEP,
-    BG_HEADER,
-    BG_PANEL,
-    BG_PANEL_HI,
-    BORDER_DIM,
-    BORDER_MID,
-    BTN_DARK,
-    NEON_CYAN,
-    NEON_GREEN,
-    NEON_ORANGE,
-    NEON_PINK,
-    NEON_PURPLE,
-    NEON_YELLOW,
-    RED,
-    TXT,
-    TXT_DARK,
-    TXT_DIM,
-    draw_gradient,
-    draw_scanlines,
-    neon_label,
-    rounded_rect,
-    styled_entry,
-)
 
-CARD_W = 200
-CARD_H = 292
-CARD_GAP = 16
-GRID_PAD = 18
-COVER_BOX = 176
-MAX_COLS = 6
-TITLE_CHARS = 24
+# Palette sombre, sobre.
+BG = "#2d2d30"
+PANEL = "#383838"
+FIELD = "#262626"
+LINE = "#4a4a4c"
+FG = "#e9e9e9"
+DIM = "#9d9d9d"
+SEL = "#2f6ea5"
+DANGER = "#e06c75"
+OK = "#8cc265"
 
-
-def _wrap(text: str, width: int = TITLE_CHARS, max_lines: int = 3) -> str:
-    words = str(text).split()
-    lines: list[str] = []
-    cur = ""
-    for word in words:
-        trial = f"{cur} {word}".strip()
-        if len(trial) <= width:
-            cur = trial
-        else:
-            if cur:
-                lines.append(cur)
-            cur = word
-            if len(lines) == max_lines - 1:
-                break
-    if cur and len(lines) < max_lines:
-        lines.append(cur)
-    if not lines:
-        lines = [str(text)[:width]]
-    used = sum(len(line) + 1 for line in lines)
-    if used < len(str(text)):
-        lines[-1] = lines[-1][: max(1, width - 1)] + "…"
-    return "\n".join(lines[:max_lines])
+THUMB_H = 46
+ROW_H = 56
 
 
 def _norm(text: str) -> str:
@@ -90,19 +42,31 @@ def _norm(text: str) -> str:
     )
 
 
-class LauncherApp(tk.Tk):
-    def __init__(self, title_family: str = "Courier", body_family: str = "Courier") -> None:
-        super().__init__()
-        self.overrideredirect(True)
-        self.configure(bg="#4a1f7a")
-        self.title(f"Kirby Retro Launcher v{__version__}")
+def _human_size(game: dict[str, Any]) -> str:
+    try:
+        size = int(game.get("size") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if size <= 0:
+        return ""
+    mo = size / (1024 * 1024)
+    if mo >= 1024:
+        return f"{mo / 1024:.2f} Gio"
+    if mo >= 1:
+        return f"{mo:.1f} Mio"
+    return f"{max(1, size // 1024)} Kio"
 
+
+class LauncherApp(tk.Tk):
+    def __init__(self, title_family: str = "", body_family: str = "") -> None:
+        super().__init__()
+        self.title(f"Kirby Retro Launcher v{__version__}")
+        self.configure(bg=BG)
+        self.minsize(920, 560)
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        self._win_w = min(1280, max(940, sw - 80))
-        self._win_h = min(820, max(620, sh - 80))
+        width, height = min(1180, max(920, sw - 120)), min(760, max(560, sh - 120))
         self.geometry(
-            f"{self._win_w}x{self._win_h}"
-            f"+{max(0, (sw - self._win_w) // 2)}+{max(0, (sh - self._win_h) // 2 - 24)}"
+            f"{width}x{height}+{max(0, (sw - width) // 2)}+{max(0, (sh - height) // 2 - 20)}"
         )
 
         self.config_data = autofill(load_config())
@@ -113,174 +77,182 @@ class LauncherApp(tk.Tk):
         )
         self.music = MusicPlayer(self.config_data)
 
-        self._cards: list[dict[str, Any]] = []
+        self._rows: dict[str, dict[str, Any]] = {}
         self._thumbs: dict[str, tk.PhotoImage] = {}
-        self._chip_widgets: dict[str, tk.Label] = {}
-        self._head_windows: list[tuple[int, tk.Label]] = []
+        self._filter_map: dict[str, str] = {"Toutes les consoles": "all"}
         self._filter_system = "all"
-        self._selected: int | None = None
-        self._hover: int | None = None
-        self._scroll = 0
-        self._scroll_max = 0
-        self._sb: tuple[int, int, int] | None = None
-        self._sb_drag = False
-        self._sb_grab = 0
+        self._sort_col = "title"
+        self._sort_rev = False
         self._busy = False
         self._music_synced = False
-        self._last_size = (0, 0)
-        self._drag_origin: tuple[int, int] | None = None
 
-        self._status = tk.StringVar(value="Allumage de la borne…")
+        self._status = tk.StringVar(value="Chargement du catalogue…")
+        self._count = tk.StringVar(value="")
         self._search = tk.StringVar()
+        self._music_var = tk.BooleanVar(value=bool(self.config_data.get("music", True)))
 
-        self.f_title = tkfont.Font(family=title_family, size=13, weight="bold")
-        self.f_title_sm = tkfont.Font(family=title_family, size=8)
-        self.f_card = tkfont.Font(family=title_family, size=7)
-        self.f_body = tkfont.Font(family=body_family, size=16)
-        self.f_small = tkfont.Font(family=body_family, size=13)
-        self.f_badge = tkfont.Font(family=body_family, size=12)
+        self._setup_style()
+        self._build_menu()
+        self._build_toolbar()
+        self._build_list()
+        self._build_statusbar()
 
-        self._build()
         threading.Thread(target=self._music_prepare, daemon=True).start()
         self.after(150, self.refresh_library)
         self.after(300, self._poll)
         self.bind("<F5>", lambda _e: self.refresh_library())
-        self.bind("<Return>", lambda _e: self.play_selected())
+        self.bind("<Control-q>", lambda _e: self.on_close())
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    # construction
-    def _build(self) -> None:
-        outer = tk.Frame(self, bg="#4a1f7a")
-        outer.pack(fill="both", expand=True)
-        glow2 = tk.Frame(outer, bg="#8a2be2")
-        glow2.pack(fill="both", expand=True, padx=2, pady=2)
-        glow3 = tk.Frame(glow2, bg=NEON_PINK)
-        glow3.pack(fill="both", expand=True, padx=1, pady=1)
-        deep = tk.Frame(glow3, bg="#201038")
-        deep.pack(fill="both", expand=True, padx=1, pady=1)
-        root = tk.Frame(deep, bg=BG_DARK)
-        root.pack(fill="both", expand=True)
-        self._build_header(root)
-        self._build_toolbar(root)
-        self._build_grid(root)
-        self._build_footer(root)
-
-    def _build_header(self, parent) -> None:
-        self._head = tk.Canvas(parent, height=54, bg=BG_HEADER, highlightthickness=0, bd=0)
-        self._head.pack(fill="x")
-        head = self._head
-        head.bind("<Button-1>", self._drag_start)
-        head.bind("<B1-Motion>", self._drag_move)
-        head.create_text(24, 30, text="KIRBY RETRO LAUNCHER", font=self.f_title,
-                         fill="#5c2488", anchor="w")
-        self._title_id = head.create_text(22, 28, text="KIRBY RETRO LAUNCHER",
-                                          font=self.f_title, fill=NEON_ORANGE, anchor="w")
-        title_w = self.f_title.measure("KIRBY RETRO LAUNCHER")
-        head.create_text(30 + title_w, 30, text=f"v{__version__}", font=self.f_small,
-                         fill=TXT_DIM, anchor="w")
-        self._btn_close = self._head_text_button("X", RED, self.on_close)
-        self._btn_min = self._head_text_button("-", TXT_DIM, self.minimize)
-        self._btn_music = self._head_text_button("MUSIQUE …", TXT_DIM, self.toggle_music)
-        self._btn_cfg = self._head_text_button("REGLAGES", NEON_CYAN, self.open_settings)
-        head.bind("<Configure>", self._place_head)
-
-    def _head_text_button(self, text: str, fg: str, command) -> tk.Label:
-        lbl = tk.Label(self._head, text=text, font=self.f_small, fg=fg, bg=BG_HEADER,
-                       padx=9, pady=3, cursor="hand2", bd=0, highlightthickness=0)
-        lbl.bind("<Button-1>", lambda _e: command())
-        lbl.bind("<Enter>", lambda _e: lbl.configure(bg=BG_PANEL_HI))
-        lbl.bind("<Leave>", lambda _e: lbl.configure(bg=BG_HEADER))
-        window_id = self._head.create_window(-999, -999, window=lbl)
-        self._head_windows.append((window_id, lbl))
-        return lbl
-
-    def _place_head(self, _event=None) -> None:
-        x = self._head.winfo_width() - 28
-        for window_id, lbl in self._head_windows:
-            self._head.coords(window_id, x, 28)
-            x -= lbl.winfo_reqwidth() + 6
-
-    def _build_toolbar(self, parent) -> None:
-        bar = tk.Frame(parent, bg=BG_DEEP, padx=14, pady=8)
-        bar.pack(fill="x")
-        tk.Label(bar, text="RECHERCHE :", font=self.f_badge, fg=NEON_PINK, bg=BG_DEEP,
-                 padx=6).pack(side="left")
-        box, entry = styled_entry(bar, self._search, font=self.f_body, width=22)
-        box.pack(side="left")
-        entry.bind("<KeyRelease>", self._on_search)
-        self._search_entry = entry
-        self._chips = tk.Frame(bar, bg=BG_DEEP)
-        self._chips.pack(side="left", fill="x", expand=True, padx=(18, 8))
-        neon_label(bar, "ACTUALISER", self.refresh_library, font=self.f_badge, fg=BG_DARK,
-                   bg=NEON_CYAN, hover_bg=NEON_YELLOW, padx=12, pady=6).pack(side="right")
-
-    def _build_grid(self, parent) -> None:
-        wrap = tk.Frame(parent, bg=BG_DARK)
-        wrap.pack(fill="both", expand=True, padx=12, pady=(8, 0))
-        self.canvas = tk.Canvas(wrap, bg=BG_DARK, highlightthickness=0, bd=0)
-        self.canvas.pack(fill="both", expand=True)
-        canvas = self.canvas
-        canvas.bind("<MouseWheel>", self._on_wheel)
-        canvas.bind("<Button-4>", lambda _e: self._scroll_by(-72))
-        canvas.bind("<Button-5>", lambda _e: self._scroll_by(72))
-        canvas.bind("<Motion>", self._on_motion)
-        canvas.bind("<Leave>", lambda _e: self._set_hover(None))
-        canvas.bind("<ButtonPress-1>", self._on_press)
-        canvas.bind("<B1-Motion>", self._on_drag)
-        canvas.bind("<ButtonRelease-1>", lambda _e: setattr(self, "_sb_drag", False))
-        canvas.bind("<Double-Button-1>", self._on_double)
-        canvas.bind("<Button-3>", self._on_right)
-        canvas.bind("<Configure>", self._on_resize)
-
-    def _build_footer(self, parent) -> None:
-        foot = tk.Frame(parent, bg=BG_HEADER, padx=14, pady=10)
-        foot.pack(fill="x", padx=12, pady=(8, 12))
-        self._btn_play = neon_label(foot, "JOUER", self.play_selected, font=self.f_title_sm,
-                                    fg=BG_DARK, bg=NEON_ORANGE, hover_bg=NEON_YELLOW,
-                                    padx=22, pady=10)
-        self._btn_play.pack(side="left")
-        self._btn_net = neon_label(foot, "EN LIGNE", self.netplay_selected, font=self.f_title_sm,
-                                   fg=TXT, bg=NEON_PURPLE, hover_fg=BG_DARK, hover_bg=NEON_PINK,
-                                   padx=22, pady=10)
-        self._btn_net.pack(side="left", padx=10)
-        self._btn_saves = neon_label(foot, "SAUVEGARDES", self.saves_selected, font=self.f_title_sm,
-                                     fg=TXT, bg=BG_PANEL_HI, hover_fg=BG_DARK, hover_bg=NEON_CYAN,
-                                     padx=16, pady=10)
-        self._btn_saves.pack(side="left")
-        tk.Label(foot, textvariable=self._status, font=self.f_body, fg=TXT_DIM, bg=BG_HEADER,
-                 anchor="e").pack(side="right", fill="x", expand=True, padx=(16, 0))
-
-    # fenêtre (sans bordure)
-    def _drag_start(self, event) -> None:
-        self._drag_origin = (event.x_root - self.winfo_x(), event.y_root - self.winfo_y())
-
-    def _drag_move(self, event) -> None:
-        if self._drag_origin:
-            self.geometry(
-                f"+{event.x_root - self._drag_origin[0]}+{event.y_root - self._drag_origin[1]}"
-            )
-
-    def minimize(self) -> None:
+    # apparence
+    def _setup_style(self) -> None:
+        style = ttk.Style(self)
         try:
-            self.overrideredirect(False)
-            self.iconify()
-            self._map_bind = self.bind("<Map>", self._restore_borderless, add="+")
+            style.theme_use("clam")
         except tk.TclError:
             pass
+        style.configure(".", background=BG, foreground=FG, fieldbackground=FIELD,
+                        bordercolor=LINE, lightcolor=PANEL, darkcolor=PANEL, focuscolor=BG)
+        style.configure("TFrame", background=BG)
+        style.configure("TLabel", background=BG, foreground=FG)
+        style.configure("Dim.TLabel", foreground=DIM)
+        style.configure("TButton", background=PANEL, foreground=FG, relief="flat",
+                        padding=(10, 5), borderwidth=1)
+        style.map("TButton",
+                  background=[("pressed", "#4c4c50"), ("active", "#454549"), ("disabled", BG)],
+                  foreground=[("disabled", DIM)])
+        style.configure("Tool.TButton", padding=(12, 6))
+        style.configure("TCheckbutton", background=BG, foreground=FG, focuscolor=BG)
+        style.map("TCheckbutton", background=[("active", BG)])
+        style.configure("TRadiobutton", background=BG, foreground=FG, focuscolor=BG)
+        style.map("TRadiobutton", background=[("active", BG)])
+        style.configure("TEntry", fieldbackground=FIELD, foreground=FG, insertcolor=FG,
+                        bordercolor=LINE, lightcolor=LINE, darkcolor=LINE)
+        style.configure("TSeparator", background=LINE)
+        style.configure("TProgressbar", background=SEL, troughcolor=FIELD, bordercolor=BG,
+                        lightcolor=SEL, darkcolor=SEL)
+        style.configure("Treeview", background=FIELD, fieldbackground=FIELD, foreground=FG,
+                        bordercolor=LINE, lightcolor=FIELD, darkcolor=FIELD, relief="flat",
+                        rowheight=ROW_H)
+        style.map("Treeview",
+                  background=[("selected", SEL)], foreground=[("selected", "#ffffff")])
+        style.configure("Treeview.Heading", background=PANEL, foreground=FG, relief="flat",
+                        padding=(6, 4))
+        style.map("Treeview.Heading", background=[("active", "#454549")])
+        style.configure("TCombobox", fieldbackground=FIELD, background=PANEL, foreground=FG,
+                        arrowcolor=FG, bordercolor=LINE, lightcolor=LINE, darkcolor=LINE)
+        style.map("TCombobox",
+                  fieldbackground=[("readonly", FIELD)], foreground=[("readonly", FG)],
+                  background=[("readonly", PANEL)])
+        # listes déroulantes et menus (options classiques Tk)
+        self.option_add("*TCombobox*Listbox.background", FIELD)
+        self.option_add("*TCombobox*Listbox.foreground", FG)
+        self.option_add("*TCombobox*Listbox.selectBackground", SEL)
+        self.option_add("*TCombobox*Listbox.selectForeground", "#ffffff")
+        self.option_add("*Menu.background", PANEL)
+        self.option_add("*Menu.foreground", FG)
+        self.option_add("*Menu.activeBackground", SEL)
+        self.option_add("*Menu.activeForeground", "#ffffff")
+        self.option_add("*Menu.activeBorderWidth", 0)
+        self.option_add("*Menu.borderWidth", 1)
+        self.option_add("*Menu.relief", "flat")
 
-    def _restore_borderless(self, _event=None) -> None:
-        try:
-            self.unbind("<Map>", self._map_bind)
-        except tk.TclError:
-            pass
-        self.after(10, self._apply_borderless)
+    def _build_menu(self) -> None:
+        menubar = tk.Menu(self)
 
-    def _apply_borderless(self) -> None:
-        try:
-            self.overrideredirect(True)
-            self.lift()
-        except tk.TclError:
-            pass
+        fichier = tk.Menu(menubar, tearoff=0)
+        fichier.add_command(label="Lancer le jeu sélectionné", command=self.play_selected)
+        fichier.add_command(label="Actualiser la bibliothèque", command=self.refresh_library)
+        fichier.add_separator()
+        fichier.add_command(label="Quitter", command=self.on_close)
+        menubar.add_cascade(label="Fichier", menu=fichier)
+
+        emulation = tk.Menu(menubar, tearoff=0)
+        emulation.add_command(label="Démarrer", command=self.play_selected)
+        emulation.add_command(label="Jouer en ligne (netplay)…", command=self.netplay_selected)
+        emulation.add_command(label="Sauvegardes…", command=self.saves_selected)
+        menubar.add_cascade(label="Émulation", menu=emulation)
+
+        options = tk.Menu(menubar, tearoff=0)
+        options.add_command(label="Paramètres…", command=self.open_settings)
+        options.add_checkbutton(label="Musique", variable=self._music_var, command=self.toggle_music)
+        options.add_separator()
+        options.add_command(label="Installer le protocole kirbyretro://", command=self._install_protocol)
+        options.add_command(label="Diagnostic…", command=self.open_doctor)
+        menubar.add_cascade(label="Options", menu=options)
+
+        self._view_menu = tk.Menu(menubar, tearoff=0)
+        self._view_menu.add_command(label="Toutes les consoles",
+                                    command=lambda: self._set_filter("all"))
+        menubar.add_cascade(label="Affichage", menu=self._view_menu)
+
+        aide = tk.Menu(menubar, tearoff=0)
+        aide.add_command(label="À propos", command=self._about)
+        menubar.add_cascade(label="Aide", menu=aide)
+
+        self.config(menu=menubar)
+
+    def _build_toolbar(self) -> None:
+        bar = ttk.Frame(self)
+        bar.pack(fill="x", padx=10, pady=(8, 4))
+        ttk.Button(bar, text="Démarrer", style="Tool.TButton",
+                   command=self.play_selected).pack(side="left")
+        ttk.Button(bar, text="En ligne", style="Tool.TButton",
+                   command=self.netplay_selected).pack(side="left", padx=(6, 0))
+        ttk.Button(bar, text="Sauvegardes", style="Tool.TButton",
+                   command=self.saves_selected).pack(side="left", padx=(6, 0))
+        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=10, pady=2)
+        ttk.Button(bar, text="Rafraîchir", style="Tool.TButton",
+                   command=self.refresh_library).pack(side="left")
+        ttk.Button(bar, text="Paramètres", style="Tool.TButton",
+                   command=self.open_settings).pack(side="left", padx=(6, 0))
+
+        ttk.Label(bar, text="Rechercher :", style="Dim.TLabel").pack(side="left", padx=(18, 4))
+        search = ttk.Entry(bar, textvariable=self._search, width=24)
+        search.pack(side="left")
+        search.bind("<KeyRelease>", self._on_search)
+
+        ttk.Label(bar, text="Console :", style="Dim.TLabel").pack(side="left", padx=(14, 4))
+        self._filter_box = ttk.Combobox(bar, state="readonly", width=20,
+                                        values=["Toutes les consoles"])
+        self._filter_box.current(0)
+        self._filter_box.pack(side="left")
+        self._filter_box.bind("<<ComboboxSelected>>", self._on_filter_combo)
+
+    def _build_list(self) -> None:
+        wrap = ttk.Frame(self)
+        wrap.pack(fill="both", expand=True, padx=10, pady=(4, 0))
+        columns = ("title", "console", "year", "size", "file")
+        self.tree = ttk.Treeview(wrap, columns=columns, show="tree headings",
+                                 selectmode="browse", height=6)
+        self.tree.heading("#0", text="Bannière")
+        self.tree.column("#0", width=76, minwidth=76, stretch=False, anchor="center")
+        headings = (
+            ("title", "Titre", 420, "w"),
+            ("console", "Console", 130, "w"),
+            ("year", "Année", 70, "center"),
+            ("size", "Taille", 90, "e"),
+            ("file", "Fichier", 260, "w"),
+        )
+        for key, text, width, anchor in headings:
+            self.tree.heading(key, text=text, command=lambda k=key: self._sort_by(k))
+            self.tree.column(key, width=width, anchor=anchor,
+                             stretch=key in ("title", "file"))
+        scroll = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        self.tree.pack(fill="both", expand=True)
+        self.tree.bind("<Double-1>", self._on_double_click)
+        self.tree.bind("<Return>", lambda _e: self.play_selected())
+        self.tree.bind("<Button-3>", self._on_right_click)
+        self.tree.bind("<<TreeviewSelect>>", self._on_select)
+
+    def _build_statusbar(self) -> None:
+        bar = ttk.Frame(self)
+        bar.pack(fill="x", padx=10, pady=(6, 8))
+        ttk.Label(bar, textvariable=self._status, style="Dim.TLabel").pack(side="left")
+        self._progress = ttk.Progressbar(bar, mode="indeterminate", length=140)
+        ttk.Label(bar, textvariable=self._count, style="Dim.TLabel").pack(side="right")
 
     def _set_status(self, text: str) -> None:
         self._status.set(text)
@@ -298,34 +270,27 @@ class LauncherApp(tk.Tk):
         if not self._music_synced:
             self._music_synced = True
             if self.music.problem and not self.music.usable:
-                self._set_status(f"♪ {self.music.problem}")
+                self._set_status(self.music.problem)
             elif self.music.enabled:
                 self.music.start()
         elif self.music.enabled and self.music.usable:
             self.music.start()
-        self._update_music_button()
-
-    def _update_music_button(self) -> None:
-        if self.music.usable and self.music.enabled:
-            text, color = "MUSIQUE ON", NEON_GREEN
-        elif self.music.usable:
-            text, color = "MUSIQUE OFF", RED
-        else:
-            text, color = "MUSIQUE ?", TXT_DIM
-        self._btn_music.configure(text=text, fg=color)
+        self._music_var.set(bool(self.music.enabled))
 
     def toggle_music(self) -> None:
         if not self.music.prepare_done:
-            self._set_status("♪ préparation de la chiptune…")
+            self._set_status("Chiptune en préparation…")
+            self._music_var.set(bool(self.music.enabled))
             return
         if not self.music.usable:
-            self._set_status(f"♪ {self.music.problem or 'lecteur audio indisponible'}")
+            self._set_status(self.music.problem or "Lecteur audio indisponible")
+            self._music_var.set(bool(self.music.enabled))
             return
         on = self.music.toggle()
         self.config_data["music"] = on
         save_config(self.config_data)
-        self._update_music_button()
-        self._set_status("♪ musique " + ("activée" if on else "coupée"))
+        self._music_var.set(on)
+        self._set_status("Musique " + ("activée" if on else "coupée"))
 
     # boucle de fond
     def _poll(self) -> None:
@@ -334,30 +299,29 @@ class LauncherApp(tk.Tk):
         self.after(300, self._poll)
 
     def _poll_covers(self) -> None:
-        changed = False
         while True:
             try:
                 key, path = self.covers.results.get_nowait()
             except Empty:
                 break
-            if path is not None:
-                image = self._load_image(path)
-                if image is not None:
-                    self._thumbs[key] = image
-                    changed = True
-        if changed:
-            self._render_cards()
+            if path is None:
+                continue
+            image = self._load_thumb(path)
+            if image is None:
+                continue
+            self._thumbs[key] = image
+            for iid, game in self._rows.items():
+                if CoverManager.key(game["_system"], game["file"]) == key:
+                    self.tree.item(iid, image=image)
 
-    def _load_image(self, path: Path) -> tk.PhotoImage | None:
+    def _load_thumb(self, path: Path) -> tk.PhotoImage | None:
         try:
             image = tk.PhotoImage(file=str(path))
         except tk.TclError:
             return None
-        longest = max(image.width(), image.height())
-        if longest > COVER_BOX - 2:
-            factor = max(1, math.ceil(longest / (COVER_BOX - 2)))
-            if factor > 1:
-                image = image.subsample(factor)
+        factor = math.ceil(image.height() / THUMB_H)
+        if factor > 1:
+            image = image.subsample(factor)
         return image
 
     # catalogue
@@ -372,7 +336,7 @@ class LauncherApp(tk.Tk):
                 data = fetch_library(site)
             except Exception as exc:  # noqa: BLE001
                 error = str(exc)
-            self.after(0, lambda data=data, error=error: self._on_library(data, error))
+            self.after(0, lambda: self._on_library(data, error))
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -381,12 +345,10 @@ class LauncherApp(tk.Tk):
             self._set_status(f"Site injoignable : {error or 'réponse vide'} (F5 pour réessayer)")
             return
         self.library = data
-        self._rebuild_chips()
-        self._scroll = 0
-        self._selected = None
-        self._render_cards()
+        self._rebuild_filter_choices()
+        self._render_list()
         total = sum(len(s.get("games") or []) for s in data.get("systems") or [])
-        self._set_status(f"{total} jeux — double-clic pour lancer · clic droit = options")
+        self._set_status(f"{total} jeux — double-clic pour lancer")
 
     def _all_games(self) -> list[dict[str, Any]]:
         games: list[dict[str, Any]] = []
@@ -402,7 +364,7 @@ class LauncherApp(tk.Tk):
 
     def _filtered_games(self) -> list[dict[str, Any]]:
         needle = _norm(self._search.get().strip())
-        out: list[dict[str, Any]] = []
+        games: list[dict[str, Any]] = []
         for game in self._all_games():
             if self._filter_system != "all" and game["_system"] != self._filter_system:
                 continue
@@ -410,276 +372,100 @@ class LauncherApp(tk.Tk):
                 hay = _norm(f"{game.get('title') or ''} {game.get('file') or ''} {game['_label']}")
                 if needle not in hay:
                     continue
-            out.append(game)
-        return out
+            games.append(game)
+        keys = {
+            "title": lambda g: _norm(g.get("title") or g.get("file") or ""),
+            "console": lambda g: _norm(g.get("_label") or ""),
+            "year": lambda g: int(g.get("year") or 0),
+            "size": lambda g: int(g.get("size") or 0),
+            "file": lambda g: _norm(g.get("file") or ""),
+        }
+        games.sort(key=keys.get(self._sort_col, keys["title"]), reverse=self._sort_rev)
+        return games
 
-    # filtres
-    def _on_search(self, _event=None) -> None:
-        self._scroll = 0
-        self._selected = None
-        self._render_cards()
-
-    def _rebuild_chips(self) -> None:
-        for child in self._chips.winfo_children():
-            child.destroy()
-        self._chip_widgets = {}
-        systems = [
-            (
-                str(s.get("id") or ""),
-                str(s.get("label") or s.get("name") or s.get("id")),
-                len(s.get("games") or []),
-            )
-            for s in (self.library or {}).get("systems") or []
-            if s.get("games")
-        ]
-        total = sum(count for _sid, _label, count in systems)
-        self._add_chip("all", f"TOUTES ({total})")
-        for sid, label, count in systems:
-            self._add_chip(sid, f"{label.upper()} ({count})")
-        self._style_chips()
-
-    def _add_chip(self, sid: str, text: str) -> None:
-        lbl = tk.Label(self._chips, text=text, font=self.f_badge, padx=9, pady=4,
-                       cursor="hand2", bd=0, highlightthickness=0)
-        lbl.bind("<Button-1>", lambda _e, s=sid: self._set_filter(s))
-        lbl.bind("<Enter>", lambda _e, s=sid: self._chip_hover(s, True))
-        lbl.bind("<Leave>", lambda _e, s=sid: self._chip_hover(s, False))
-        lbl.pack(side="left", padx=3, pady=1)
-        self._chip_widgets[sid] = lbl
-
-    def _chip_hover(self, sid: str, active: bool) -> None:
-        if sid == self._filter_system:
-            return
-        lbl = self._chip_widgets.get(sid)
-        if lbl is not None:
-            lbl.configure(bg=BORDER_MID if active else BG_PANEL_HI)
-
-    def _style_chips(self) -> None:
-        for sid, lbl in self._chip_widgets.items():
-            if sid == self._filter_system:
-                lbl.configure(bg=NEON_ORANGE, fg=BG_DARK)
-            else:
-                lbl.configure(bg=BG_PANEL_HI, fg=TXT)
-
-    def _set_filter(self, sid: str) -> None:
-        self._filter_system = sid
-        self._style_chips()
-        self._scroll = 0
-        self._selected = None
-        self._render_cards()
-
-    # rendu
-    def _on_resize(self, _event=None) -> None:
-        size = (self.canvas.winfo_width(), self.canvas.winfo_height())
-        if size != self._last_size:
-            self._last_size = size
-            self._render_cards()
-
-    def _render_cards(self) -> None:
-        canvas = self.canvas
-        canvas.delete("all")
-        self._cards = []
-        self._hover = None
-        self._sb = None
-        width = max(320, canvas.winfo_width())
-        height = max(240, canvas.winfo_height())
-        draw_gradient(canvas, 0, 0, width, height)
-        draw_scanlines(canvas, 0, 0, width, height)
-
+    # liste
+    def _render_list(self) -> None:
+        selected = self._selected_game()
+        self.tree.delete(*self.tree.get_children())
+        self._rows = {}
         games = self._filtered_games()
-        if not games:
-            canvas.create_text(width // 2, height // 3, text="AUCUN JEU", font=self.f_title_sm,
-                               fill=NEON_PINK)
-            hint = ("Chargement du catalogue…" if self.library is None
-                    else "Essaie un autre filtre ou une autre recherche")
-            canvas.create_text(width // 2, height // 3 + 36, text=hint, font=self.f_body,
-                               fill=TXT_DIM)
-            self._scroll, self._scroll_max = 0, 0
-            return
-
-        cols = max(1, min(MAX_COLS, (width - 2 * GRID_PAD + CARD_GAP) // (CARD_W + CARD_GAP)))
-        grid_w = cols * CARD_W + (cols - 1) * CARD_GAP
-        x0 = max(GRID_PAD, (width - grid_w) // 2)
-        y0 = GRID_PAD
-
         for idx, game in enumerate(games):
-            row, col = divmod(idx, cols)
-            x = x0 + col * (CARD_W + CARD_GAP)
-            y = y0 + row * (CARD_H + CARD_GAP) - self._scroll
-            if y + CARD_H < -20 or y > height + 20:
-                self._cards.append({"game": game, "x": x, "y": y, "visible": False})
-                continue
-            self._draw_card(idx, game, x, y)
+            iid = f"g{idx}"
+            self._rows[iid] = game
+            self.tree.insert(
+                "", "end", iid=iid, text="",
+                values=(
+                    game.get("title") or game.get("file") or "?",
+                    game.get("_label") or game.get("_system") or "",
+                    game.get("year") or "",
+                    _human_size(game),
+                    game.get("file") or "",
+                ),
+            )
+            self._apply_thumb(iid, game)
+        if selected is not None:
+            for iid, game in self._rows.items():
+                if game is selected:
+                    self.tree.selection_set(iid)
+                    self.tree.see(iid)
+                    break
+        count = len(games)
+        self._count.set(f"{count} jeu" + ("x" if count != 1 else ""))
+        if count == 0 and self.library is not None:
+            self._set_status("Aucun jeu — change de filtre ou vérifie le dossier ROMs")
 
-        rows = (len(games) + cols - 1) // cols
-        content_h = y0 + rows * (CARD_H + CARD_GAP) + GRID_PAD
-        self._scroll_max = max(0, content_h - height)
-        self._scroll = max(0, min(self._scroll, self._scroll_max))
-        self._draw_scrollbar(width, height)
-        if self._selected is not None and self._selected < len(self._cards):
-            self._apply_card_style(self._selected)
-
-    def _draw_card(self, idx: int, game: dict[str, Any], x: int, y: int) -> None:
-        canvas = self.canvas
-        tags = ("cards", f"card{idx}")
-        glow = rounded_rect(canvas, x - 7, y - 7, x + CARD_W + 7, y + CARD_H + 7, 16,
-                            fill=NEON_ORANGE, outline="", stipple="gray25", tags=tags, state="hidden")
-        panel = rounded_rect(canvas, x, y, x + CARD_W, y + CARD_H, 12,
-                             fill=BG_PANEL, outline=BORDER_DIM, width=2, tags=tags)
-        accent = canvas.create_rectangle(x + 14, y + 3, x + CARD_W - 14, y + 6,
-                                         fill=NEON_PURPLE, outline="", tags=tags)
-        canvas.create_text(x + 15, y + 24, text=str(game["_label"]).upper(), anchor="w",
-                           font=self.f_badge, fill=NEON_CYAN, tags=tags)
-        box_y = y + 36
-        thumb, state = self._thumb_for(game)
-        if thumb is not None:
-            canvas.create_image(x + CARD_W / 2, box_y + COVER_BOX / 2, image=thumb, tags=tags)
-        else:
-            rounded_rect(canvas, x + 14, box_y, x + CARD_W - 14, box_y + COVER_BOX, 8,
-                         fill=BG_DEEP, outline=BORDER_DIM, width=1, tags=tags)
-            word = {"pending": "… JAQUETTE …", "none": "PAS DE JAQUETTE"}.get(state, "…")
-            canvas.create_text(x + CARD_W / 2, box_y + COVER_BOX / 2, text=word,
-                               font=self.f_small, fill=TXT_DARK, tags=tags)
-        title = _wrap(game.get("title") or game.get("file") or "?")
-        title_id = canvas.create_text(x + CARD_W / 2, y + CARD_H - 44, text=title,
-                                      font=self.f_card, fill=TXT, justify="center",
-                                      width=CARD_W - 22, tags=tags)
-        self._cards.append({
-            "game": game, "x": x, "y": y, "visible": True,
-            "glow": glow, "panel": panel, "accent": accent, "title": title_id,
-        })
-
-    def _thumb_for(self, game: dict[str, Any]) -> tuple[tk.PhotoImage | None, str]:
+    def _apply_thumb(self, iid: str, game: dict[str, Any]) -> None:
         key = CoverManager.key(game["_system"], game["file"])
         thumb = self._thumbs.get(key)
-        if thumb is not None:
-            return thumb, "ready"
-        state, path = self.covers.resolve(game["_system"], game["file"],
-                                          str(game.get("cover") or ""))
-        if state == "ready" and path is not None:
-            image = self._load_image(path)
-            if image is not None:
-                self._thumbs[key] = image
-                return image, "ready"
-            return None, "none"
-        return None, state
+        if thumb is None:
+            state, path = self.covers.resolve(game["_system"], game["file"],
+                                              str(game.get("cover") or ""))
+            if state == "ready" and path is not None:
+                thumb = self._load_thumb(path)
+                if thumb is not None:
+                    self._thumbs[key] = thumb
+        if thumb is not None and self.tree.exists(iid):
+            self.tree.item(iid, image=thumb)
 
-    def _draw_scrollbar(self, width: int, height: int) -> None:
-        if self._scroll_max <= 0:
-            self._sb = None
-            return
-        canvas = self.canvas
-        track_x = width - 12
-        thumb_h = max(36, int(height * height / (height + self._scroll_max)))
-        thumb_y = int((height - thumb_h) * (self._scroll / self._scroll_max))
-        rounded_rect(canvas, track_x, 0, track_x + 6, height, 3, fill="#241140", outline="")
-        rounded_rect(canvas, track_x, thumb_y, track_x + 6, thumb_y + thumb_h, 3,
-                     fill=NEON_PURPLE, outline="")
-        self._sb = (track_x, thumb_y, thumb_h)
+    def _sort_by(self, column: str) -> None:
+        if self._sort_col == column:
+            self._sort_rev = not self._sort_rev
+        else:
+            self._sort_col, self._sort_rev = column, False
+        self._render_list()
 
-    # interactions
-    def _card_at(self, ex: int, ey: int) -> int | None:
-        for i, card in enumerate(self._cards):
-            if not card.get("visible", True):
-                continue
-            if card["x"] <= ex <= card["x"] + CARD_W and card["y"] <= ey <= card["y"] + CARD_H:
-                return i
+    def _selected_game(self) -> dict[str, Any] | None:
+        selection = self.tree.selection()
+        if selection:
+            return self._rows.get(selection[0])
         return None
 
-    def _apply_card_style(self, idx: int) -> None:
-        if idx < 0 or idx >= len(self._cards):
-            return
-        card = self._cards[idx]
-        if not card.get("visible", True):
-            return
-        canvas = self.canvas
-        hovered = idx == self._hover
-        selected = idx == self._selected
-        if hovered:
-            canvas.itemconfigure(card["glow"], state="normal", fill=NEON_ORANGE)
-            canvas.itemconfigure(card["panel"], outline=NEON_ORANGE, width=2)
-            canvas.itemconfigure(card["title"], fill=NEON_YELLOW)
-            canvas.itemconfigure(card["accent"], fill=NEON_ORANGE)
-        elif selected:
-            canvas.itemconfigure(card["glow"], state="normal", fill=NEON_CYAN, stipple="gray12")
-            canvas.itemconfigure(card["panel"], outline=NEON_CYAN, width=3)
-            canvas.itemconfigure(card["title"], fill=TXT)
-            canvas.itemconfigure(card["accent"], fill=NEON_CYAN)
-        else:
-            canvas.itemconfigure(card["glow"], state="hidden")
-            canvas.itemconfigure(card["panel"], outline=BORDER_DIM, width=2)
-            canvas.itemconfigure(card["title"], fill=TXT)
-            canvas.itemconfigure(card["accent"], fill=NEON_PURPLE)
+    def _on_select(self, _event=None) -> None:
+        game = self._selected_game()
+        if game:
+            self._set_status(f"Sélection : {game.get('title') or game.get('file')}")
 
-    def _set_hover(self, idx: int | None) -> None:
-        if idx == self._hover:
-            return
-        old, self._hover = self._hover, idx
-        if old is not None:
-            self._apply_card_style(old)
-        if idx is not None:
-            self._apply_card_style(idx)
-        self.canvas.configure(cursor="hand2" if idx is not None else "")
-
-    def _set_selected(self, idx: int | None) -> None:
-        old, self._selected = self._selected, idx
-        if old is not None:
-            self._apply_card_style(old)
-        if idx is not None:
-            self._apply_card_style(idx)
-            if idx < len(self._cards):
-                game = self._cards[idx]["game"]
-                self._set_status(f"Sélection : {game.get('title') or game.get('file')}")
-
-    def _on_motion(self, event) -> None:
-        if self._sb_drag:
-            return
-        self._set_hover(self._card_at(event.x, event.y))
-
-    def _on_press(self, event) -> None:
-        sb = self._sb
-        if sb is not None and event.x >= sb[0] - 4:
-            if sb[1] <= event.y <= sb[1] + sb[2]:
-                self._sb_drag = True
-                self._sb_grab = event.y - sb[1]
-            else:
-                room = max(1, self.canvas.winfo_height() - sb[2])
-                self._scroll = int(self._scroll_max * max(0, min(room, event.y - sb[2] / 2)) / room)
-                self._render_cards()
-            return
-        self._set_selected(self._card_at(event.x, event.y))
-
-    def _on_drag(self, event) -> None:
-        if not self._sb_drag or self._sb is None:
-            return
-        _track, _thumb_y, thumb_h = self._sb
-        room = max(1, self.canvas.winfo_height() - thumb_h)
-        target = max(0, min(room, event.y - self._sb_grab))
-        self._scroll = int(self._scroll_max * target / room)
-        self._render_cards()
-
-    def _on_double(self, event) -> None:
-        idx = self._card_at(event.x, event.y)
-        if idx is not None:
-            self._set_selected(idx)
+    def _on_double_click(self, event) -> None:
+        if self.tree.identify_row(event.y):
             self.play_selected()
 
-    def _on_right(self, event) -> None:
-        idx = self._card_at(event.x, event.y)
-        if idx is None:
+    def _on_right_click(self, event) -> None:
+        iid = self.tree.identify_row(event.y)
+        if not iid:
             return
-        self._set_selected(idx)
-        game = self._cards[idx]["game"]
+        self.tree.selection_set(iid)
+        game = self._rows.get(iid)
+        if not game:
+            return
 
         def copy_title() -> None:
             self.clipboard_clear()
             self.clipboard_append(str(game.get("title") or game.get("file")))
-            self._set_status("Titre copié ✓")
+            self._set_status("Titre copié")
 
-        menu = tk.Menu(self, tearoff=0, bg=BG_PANEL_HI, fg=TXT, activebackground=NEON_ORANGE,
-                       activeforeground=BG_DARK, font=self.f_small, bd=0)
-        menu.add_command(label="Jouer", command=self.play_selected)
-        menu.add_command(label="Jouer en ligne (netplay)", command=self.netplay_selected)
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Démarrer", command=self.play_selected)
+        menu.add_command(label="Jouer en ligne (netplay)…", command=self.netplay_selected)
         menu.add_command(label="Sauvegardes…", command=lambda: self._open_saves(game))
         menu.add_separator()
         menu.add_command(label="Copier le titre", command=copy_title)
@@ -688,32 +474,45 @@ class LauncherApp(tk.Tk):
         finally:
             menu.grab_release()
 
-    def _on_wheel(self, event) -> None:
-        delta = getattr(event, "delta", 0) or 0
-        if delta == 0:
-            return
-        if abs(delta) >= 120:
-            self._scroll_by(int(-delta / 120 * 72))
-        else:
-            self._scroll_by(int(-delta * 8))
+    # filtres
+    def _on_search(self, _event=None) -> None:
+        self._render_list()
 
-    def _scroll_by(self, dy: int) -> None:
-        new = max(0, min(self._scroll + dy, self._scroll_max))
-        if new != self._scroll:
-            self._scroll = new
-            self._render_cards()
+    def _rebuild_filter_choices(self) -> None:
+        self._filter_map = {"Toutes les consoles": "all"}
+        labels = ["Toutes les consoles"]
+        for system in (self.library or {}).get("systems") or []:
+            if not system.get("games"):
+                continue
+            sid = str(system.get("id") or "")
+            label = str(system.get("label") or system.get("name") or sid)
+            text = f"{label} ({len(system.get('games') or [])})"
+            self._filter_map[text] = sid
+            labels.append(text)
+        self._filter_box.configure(values=labels)
+        self._filter_box.set("Toutes les consoles")
+        self._view_menu.delete(0, "end")
+        for text in labels:
+            self._view_menu.add_command(
+                label=text, command=lambda t=text: self._set_filter(self._filter_map[t])
+            )
+
+    def _on_filter_combo(self, _event=None) -> None:
+        self._set_filter(self._filter_map.get(self._filter_box.get(), "all"))
+
+    def _set_filter(self, sid: str) -> None:
+        self._filter_system = sid
+        for text, value in self._filter_map.items():
+            if value == sid:
+                self._filter_box.set(text)
+                break
+        self._render_list()
 
     # lancement
-    def _selected_game(self) -> dict[str, Any] | None:
-        if self._selected is None or self._selected >= len(self._cards):
-            return None
-        card = self._cards[self._selected]
-        return card.get("game")
-
     def play_selected(self) -> None:
         game = self._selected_game()
         if not game:
-            self._set_status("Clique d'abord sur un jeu, puis JOUER !")
+            self._set_status("Sélectionne un jeu dans la liste, puis Démarrer")
             return
         self._start_job(
             lambda progress: launch_game(
@@ -724,14 +523,14 @@ class LauncherApp(tk.Tk):
     def netplay_selected(self) -> None:
         game = self._selected_game()
         if not game:
-            self._set_status("Clique d'abord sur un jeu, puis EN LIGNE !")
+            self._set_status("Sélectionne un jeu dans la liste, puis En ligne")
             return
         self._open_netplay(game)
 
     def saves_selected(self) -> None:
         game = self._selected_game()
         if not game:
-            self._set_status("Clique d'abord sur un jeu, puis SAUVEGARDES !")
+            self._set_status("Sélectionne un jeu dans la liste, puis Sauvegardes")
             return
         self._open_saves(game)
 
@@ -740,6 +539,8 @@ class LauncherApp(tk.Tk):
             self._set_status("Une partie se prépare déjà…")
             return
         self._busy = True
+        self._progress.pack(side="right", padx=(0, 10))
+        self._progress.start(12)
 
         def progress(message: str) -> None:
             self.after(0, lambda message=message: self._set_status(str(message)))
@@ -755,108 +556,78 @@ class LauncherApp(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _stop_progress(self) -> None:
+        self._progress.stop()
+        self._progress.pack_forget()
+
     def _done(self, message: str) -> None:
         self._busy = False
+        self._stop_progress()
         self._set_status(f"{message} — bonne partie !")
 
     def _error(self, message: str) -> None:
         self._busy = False
-        self._set_status("Oups…")
+        self._stop_progress()
+        self._set_status("Échec du lancement")
         self._show_error(message)
 
     # dialogues
-    def _dialog(self, title: str, width: int, height: int) -> tuple[tk.Toplevel, tk.Frame]:
+    def _dialog(self, title: str, width: int, height: int) -> tuple[tk.Toplevel, ttk.Frame]:
         win = tk.Toplevel(self)
-        win.overrideredirect(True)
-        win.configure(bg="#4a1f7a")
+        win.title(title)
+        win.configure(bg=BG)
+        win.transient(self)
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry(f"{width}x{height}+{max(0, (sw - width) // 2)}+{max(0, (sh - height) // 2)}")
-        outer = tk.Frame(win, bg="#4a1f7a")
-        outer.pack(fill="both", expand=True)
-        glow2 = tk.Frame(outer, bg="#8a2be2")
-        glow2.pack(fill="both", expand=True, padx=2, pady=2)
-        glow3 = tk.Frame(glow2, bg=NEON_PINK)
-        glow3.pack(fill="both", expand=True, padx=1, pady=1)
-        root = tk.Frame(glow3, bg=BG_DARK)
-        root.pack(fill="both", expand=True, padx=1, pady=1)
-        bar = tk.Frame(root, bg=BG_HEADER, padx=10, pady=6)
-        bar.pack(fill="x")
-        bar_label = tk.Label(bar, text=title, font=self.f_title_sm, fg=NEON_ORANGE, bg=BG_HEADER)
-        bar_label.pack(side="left")
-        close = tk.Label(bar, text="X", font=self.f_title_sm, fg=RED, bg=BG_HEADER,
-                         padx=8, cursor="hand2")
-        close.pack(side="right")
-        close.bind("<Button-1>", lambda _e: win.destroy())
-        origin: list[tuple[int, int]] = []
-
-        def drag_start(event) -> None:
-            origin[:] = [(event.x_root - win.winfo_x(), event.y_root - win.winfo_y())]
-
-        def drag_move(event) -> None:
-            if origin:
-                win.geometry(f"+{event.x_root - origin[0][0]}+{event.y_root - origin[0][1]}")
-
-        for widget in (bar, bar_label):
-            widget.bind("<Button-1>", drag_start)
-            widget.bind("<B1-Motion>", drag_move)
-        body = tk.Frame(root, bg=BG_DARK, padx=16, pady=14)
+        body = ttk.Frame(win, padding=14)
         body.pack(fill="both", expand=True)
-        try:
-            win.focus_force()
-        except tk.TclError:
-            pass
+        win.bind("<Escape>", lambda _e: win.destroy())
         return win, body
 
     def _show_error(self, message: str) -> None:
-        win, body = self._dialog("ERREUR", 620, 380)
-        text = tk.Text(body, bg="#1d0620", fg="#ffb3c8", font=self.f_small, relief="flat",
-                       wrap="word", bd=0, highlightthickness=0)
+        win, body = self._dialog("Erreur", 640, 320)
+        text = tk.Text(body, wrap="word", relief="flat", bd=0, highlightthickness=1,
+                       highlightbackground=LINE, bg=FIELD, fg=FG, font="TkDefaultFont")
         text.pack(fill="both", expand=True)
         text.insert("1.0", message)
         text.configure(state="disabled")
-        neon_label(body, "OK", win.destroy, font=self.f_title_sm, fg=BG_DARK, bg=NEON_PINK,
-                   padx=20, pady=8).pack(pady=(10, 0))
+        ttk.Button(body, text="Fermer", command=win.destroy).pack(side="right", pady=(10, 0))
 
     def open_settings(self) -> None:
-        win, body = self._dialog("PARAMÈTRES", 760, 560)
+        win, body = self._dialog("Paramètres", 780, 520)
         cfg = self.config_data
-
-        def row(label: str, variable: tk.StringVar, browse_title: str) -> None:
-            line = tk.Frame(body, bg=BG_DARK)
-            line.pack(fill="x", pady=5)
-            tk.Label(line, text=label, font=self.f_badge, fg=NEON_CYAN, bg=BG_DARK,
-                     width=16, anchor="w").pack(side="left")
-            box, _entry = styled_entry(line, variable, font=self.f_body, width=32)
-            box.pack(side="left", fill="x", expand=True)
-            if browse_title:
-                def browse() -> None:
-                    from tkinter import filedialog
-
-                    chosen = filedialog.askdirectory(title=browse_title)
-                    if chosen:
-                        variable.set(chosen)
-
-                neon_label(line, "...", browse, font=self.f_small, fg=TXT, bg=BG_PANEL_HI,
-                           hover_bg=BORDER_MID, padx=10, pady=5).pack(side="left", padx=(8, 0))
+        body.columnconfigure(1, weight=1)
 
         site_var = tk.StringVar(value=str(cfg.get("site_url") or ""))
         roms_var = tk.StringVar(value=str(cfg.get("roms_dir") or ""))
         ra_var = tk.StringVar(value=str((cfg.get("retroarch") or {}).get("path") or ""))
         cores_var = tk.StringVar(value=str((cfg.get("retroarch") or {}).get("cores_dir") or ""))
         music_var = tk.StringVar(value=str(cfg.get("music_file") or ""))
-        row("Site", site_var, "")
-        row("Dossier ROMs", roms_var, "Choisis le dossier des ROMs")
-        row("RetroArch", ra_var, "Choisis le dossier de RetroArch")
-        row("Dossier cores", cores_var, "Choisis le dossier des cores libretro")
-        row("Musique perso", music_var, "Choisis un .wav/.ogg/.mp3 (vide = chiptune)")
+
+        def browse_row(row: int, label: str, variable: tk.StringVar, title: str) -> None:
+            ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", pady=5)
+            ttk.Entry(body, textvariable=variable).grid(row=row, column=1, sticky="ew",
+                                                        padx=(8, 8), pady=5)
+            if title:
+                def browse() -> None:
+                    chosen = filedialog.askdirectory(title=title)
+                    if chosen:
+                        variable.set(chosen)
+
+                ttk.Button(body, text="Parcourir…", command=browse).grid(row=row, column=2, pady=5)
+
+        browse_row(0, "Site", site_var, "")
+        browse_row(1, "Dossier ROMs", roms_var, "Choisis le dossier des ROMs")
+        browse_row(2, "RetroArch", ra_var, "Choisis le dossier de RetroArch")
+        browse_row(3, "Dossier cores", cores_var, "Choisis le dossier des cores libretro")
+        browse_row(4, "Musique perso", music_var, "Choisis un .wav/.ogg/.mp3 (vide = chiptune)")
 
         download_var = tk.BooleanVar(value=bool(cfg.get("download_missing_roms", True)))
-        tk.Checkbutton(body, text="Télécharger les ROMs manquantes depuis le site",
-                       variable=download_var, font=self.f_body, fg=TXT, bg=BG_DARK,
-                       activebackground=BG_DARK, activeforeground=NEON_CYAN,
-                       selectcolor=BTN_DARK, highlightthickness=0, bd=0).pack(anchor="w", pady=(8, 2))
-        tk.Label(body, text="Netplay : pseudo et port se règlent dans le bouton EN LIGNE.",
-                 font=self.f_small, fg=TXT_DARK, bg=BG_DARK).pack(anchor="w")
+        ttk.Checkbutton(body, text="Télécharger les ROMs manquantes depuis le site",
+                        variable=download_var).grid(row=5, column=0, columnspan=3,
+                                                    sticky="w", pady=(10, 2))
+        ttk.Label(body, text="Le pseudo et le port netplay se règlent dans « Jouer en ligne ».",
+                  style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w")
 
         def save() -> None:
             cfg["site_url"] = site_var.get().strip() or "https://retro.kirbytrim.buzz"
@@ -877,34 +648,26 @@ class LauncherApp(tk.Tk):
             except Exception:  # noqa: BLE001
                 pass
             win.destroy()
-            self._set_status("Paramètres enregistrés ✓")
+            self._set_status("Paramètres enregistrés")
             self.refresh_library()
 
-        def protocol() -> None:
-            try:
-                message = install_protocol()
-                self._set_status(message if isinstance(message, str) else "Protocole installé ✓")
-            except Exception as exc:  # noqa: BLE001
-                self._show_error(f"Protocole kirbyretro:// : {exc}")
-
-        buttons = tk.Frame(body, bg=BG_DARK)
-        buttons.pack(fill="x", side="bottom", pady=(12, 0))
-        neon_label(buttons, "DIAGNOSTIC", self.open_doctor, font=self.f_badge, fg=TXT,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=14, pady=8).pack(side="left")
-        neon_label(buttons, "ASSOCIER kirbyretro://", protocol, font=self.f_badge, fg=TXT,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=14, pady=8).pack(side="left", padx=8)
-        neon_label(buttons, "ENREGISTRER", save, font=self.f_title_sm, fg=BG_DARK, bg=NEON_GREEN,
-                   hover_bg=NEON_YELLOW, padx=16, pady=8).pack(side="right")
-        neon_label(buttons, "ANNULER", win.destroy, font=self.f_badge, fg=TXT_DIM,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=14, pady=8).pack(side="right", padx=8)
+        buttons = ttk.Frame(body)
+        buttons.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        ttk.Button(buttons, text="Diagnostic…", command=self.open_doctor).pack(side="left")
+        ttk.Button(buttons, text="Associer kirbyretro://",
+                   command=self._install_protocol).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Enregistrer", command=save).pack(side="right")
+        ttk.Button(buttons, text="Annuler", command=win.destroy).pack(side="right", padx=8)
 
     def open_doctor(self) -> None:
-        win, body = self._dialog("DIAGNOSTIC", 900, 580)
-        text = tk.Text(body, bg="#0d0518", fg=NEON_GREEN, font=self.f_small, relief="flat",
-                       wrap="word", bd=0, highlightthickness=0)
-        scrollbar = tk.Scrollbar(body, command=text.yview, width=10)
-        text.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side="right", fill="y")
+        win, body = self._dialog("Diagnostic", 900, 560)
+        wrap = ttk.Frame(body)
+        wrap.pack(fill="both", expand=True)
+        text = tk.Text(wrap, wrap="word", relief="flat", bd=0, highlightthickness=1,
+                       highlightbackground=LINE, bg=FIELD, fg=FG, font="TkFixedFont")
+        scroll = ttk.Scrollbar(wrap, orient="vertical", command=text.yview)
+        text.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
         text.pack(fill="both", expand=True)
         text.insert("1.0", "Collecte du diagnostic… (quelques secondes)")
         text.configure(state="disabled")
@@ -926,36 +689,58 @@ class LauncherApp(tk.Tk):
             self.after(0, show)
 
         threading.Thread(target=work, daemon=True).start()
+        ttk.Button(body, text="Fermer", command=win.destroy).pack(side="right", pady=(10, 0))
+
+    def _about(self) -> None:
+        win, body = self._dialog("À propos", 560, 280)
+        lines = [
+            f"Kirby Retro Launcher {__version__}",
+            "",
+            "Launcher natif du site Retro : catalogue des jeux, téléchargement",
+            "des ROMs manquantes, lancement dans RetroArch ou un émulateur natif,",
+            "netplay et transfert des sauvegardes.",
+            "",
+            f"Site : {self.config_data.get('site_url') or ''}",
+            "Code source : github.com/Trimisdumb/kirby-retro (licence MIT)",
+        ]
+        for line in lines:
+            ttk.Label(body, text=line).pack(anchor="w")
+        ttk.Button(body, text="Fermer", command=win.destroy).pack(side="right", pady=(12, 0))
+
+    def _install_protocol(self) -> None:
+        try:
+            message = install_protocol()
+            self._set_status(message if isinstance(message, str) else "Protocole installé")
+        except Exception as exc:  # noqa: BLE001
+            self._show_error(f"Protocole kirbyretro:// : {exc}")
 
     def _open_netplay(self, game: dict[str, Any]) -> None:
         title = str(game.get("title") or game.get("file") or "?")
-        win, body = self._dialog(f"EN LIGNE — {title}", 680, 620)
-        win.lift()
+        win, body = self._dialog(f"Jouer en ligne — {title}", 660, 620)
         cfg = self.config_data.setdefault("netplay", {})
 
-        tk.Label(body, text=f"{game.get('_label') or game.get('_system')} · netplay RetroArch",
-                 font=self.f_small, fg=TXT_DIM, bg=BG_DARK).pack(anchor="w")
+        ttk.Label(body, text=f"{game.get('_label') or game.get('_system')} · netplay RetroArch",
+                  style="Dim.TLabel").pack(anchor="w")
 
-        top = tk.Frame(body, bg=BG_DARK)
-        top.pack(fill="x", pady=(8, 4))
-        tk.Label(top, text="Pseudo", font=self.f_badge, fg=NEON_CYAN, bg=BG_DARK).pack(side="left")
+        top = ttk.Frame(body)
+        top.pack(fill="x", pady=(10, 4))
+        ttk.Label(top, text="Pseudo").pack(side="left")
         nick_var = tk.StringVar(value=str(cfg.get("nickname") or "Kirby"))
-        nick_box, _ne = styled_entry(top, nick_var, font=self.f_body, width=14)
-        nick_box.pack(side="left", padx=8)
-        tk.Label(top, text="Port", font=self.f_badge, fg=NEON_CYAN, bg=BG_DARK).pack(side="left",
-                                                                                      padx=(14, 0))
+        ttk.Entry(top, textvariable=nick_var, width=14).pack(side="left", padx=(6, 14))
+        ttk.Label(top, text="Port").pack(side="left")
         port_var = tk.StringVar(value=str(cfg.get("port") or DEFAULT_PORT))
-        port_box, _pe = styled_entry(top, port_var, font=self.f_body, width=6)
-        port_box.pack(side="left", padx=8)
+        ttk.Entry(top, textvariable=port_var, width=6).pack(side="left", padx=6)
 
         mode = tk.StringVar(value="host")
         relay_var = tk.BooleanVar(value=bool(cfg.get("use_relay", False)))
         address_var = tk.StringVar(value=str(cfg.get("last_host") or ""))
-        password_var = tk.StringVar()
+        password_var = tk.StringVar(value="")
 
-        host_frame = tk.Frame(body, bg=BG_DARK)
-        join_frame = tk.Frame(body, bg=BG_DARK)
-        pass_frame = tk.Frame(body, bg=BG_DARK)
+        modes = ttk.Frame(body)
+        modes.pack(fill="x", pady=(8, 2))
+        host_frame = ttk.Frame(body)
+        join_frame = ttk.Frame(body)
+        pass_frame = ttk.Frame(body)
 
         def swap() -> None:
             host_frame.pack_forget()
@@ -967,22 +752,18 @@ class LauncherApp(tk.Tk):
             else:
                 join_frame.pack(fill="x", pady=4)
 
-        modes = tk.Frame(body, bg=BG_DARK)
-        modes.pack(fill="x", pady=(8, 2))
-        for value, label in (("host", "HÉBERGER"), ("join", "REJOINDRE")):
-            tk.Radiobutton(modes, text=label, value=value, variable=mode, command=swap,
-                           font=self.f_body, fg=TXT, bg=BG_DARK, activebackground=BG_DARK,
-                           activeforeground=NEON_CYAN, selectcolor=BTN_DARK,
-                           highlightthickness=0, bd=0).pack(side="left", padx=(0, 18))
+        ttk.Radiobutton(modes, text="Héberger", value="host", variable=mode,
+                        command=swap).pack(side="left", padx=(0, 18))
+        ttk.Radiobutton(modes, text="Rejoindre", value="join", variable=mode,
+                        command=swap).pack(side="left")
 
         addresses = candidate_addresses()
         values = [f"{tag} — {ip}" for tag, ip in addresses] or ["(aucune adresse détectée)"]
 
-        tk.Label(host_frame, text="Adresse à donner à ton ami :", font=self.f_badge,
-                 fg=NEON_CYAN, bg=BG_DARK).pack(anchor="w", pady=(8, 2))
-        line = tk.Frame(host_frame, bg=BG_DARK)
+        ttk.Label(host_frame, text="Adresse à donner à ton ami :").pack(anchor="w", pady=(8, 2))
+        line = ttk.Frame(host_frame)
         line.pack(fill="x")
-        combo = ttk.Combobox(line, values=values, width=32, state="readonly", font=self.f_small)
+        combo = ttk.Combobox(line, values=values, width=30, state="readonly")
         combo.current(0)
         combo.pack(side="left")
 
@@ -992,35 +773,29 @@ class LauncherApp(tk.Tk):
             index = min(max(combo.current(), 0), len(addresses) - 1)
             self.clipboard_clear()
             self.clipboard_append(f"{addresses[index][1]}:{port_var.get().strip() or DEFAULT_PORT}")
-            self._set_status("Adresse copiée ✓ — colle-la à ton ami")
+            self._set_status("Adresse copiée — colle-la à ton ami")
 
-        neon_label(line, "COPIER", copy_address, font=self.f_badge, fg=BG_DARK, bg=NEON_CYAN,
-                   hover_bg=NEON_YELLOW, padx=12, pady=6).pack(side="left", padx=8)
-        tk.Checkbutton(host_frame,
-                       text="Relais RetroArch (aucun port à ouvrir — l'ami rejoint via le menu Netplay)",
-                       variable=relay_var, font=self.f_small, fg=TXT, bg=BG_DARK,
-                       activebackground=BG_DARK, activeforeground=NEON_CYAN,
-                       selectcolor=BTN_DARK, highlightthickness=0, bd=0).pack(anchor="w", pady=(8, 2))
-        tk.Label(host_frame,
-                 text="Sans relais : ton ami doit être sur ton Tailscale ou ton réseau local "
-                      "(sinon ouvre le port UDP sur ta box). Windows : accepte le pare-feu.",
-                 font=self.f_small, fg=TXT_DARK, bg=BG_DARK, wraplength=580,
-                 justify="left").pack(anchor="w")
+        ttk.Button(line, text="Copier", command=copy_address).pack(side="left", padx=8)
+        ttk.Checkbutton(
+            host_frame,
+            text="Relais RetroArch (aucun port à ouvrir — l'ami rejoint via le menu Netplay)",
+            variable=relay_var,
+        ).pack(anchor="w", pady=(8, 2))
+        ttk.Label(host_frame,
+                  text="Sans relais : ton ami doit être sur ton Tailscale ou ton réseau local "
+                       "(sinon ouvre le port UDP sur ta box). Windows : accepte le pare-feu.",
+                  style="Dim.TLabel", wraplength=560, justify="left").pack(anchor="w")
 
-        tk.Label(pass_frame, text="Mot de passe (optionnel, pour héberger)", font=self.f_badge,
-                 fg=NEON_CYAN, bg=BG_DARK).pack(anchor="w", pady=(8, 2))
-        pass_box, _pw = styled_entry(pass_frame, password_var, font=self.f_body, width=22)
-        pass_box.pack(anchor="w")
+        ttk.Label(pass_frame, text="Mot de passe (optionnel, pour héberger)").pack(anchor="w",
+                                                                                  pady=(8, 2))
+        ttk.Entry(pass_frame, textvariable=password_var, width=22).pack(anchor="w")
 
-        tk.Label(join_frame, text="Adresse donnée par ton ami :", font=self.f_badge,
-                 fg=NEON_CYAN, bg=BG_DARK).pack(anchor="w", pady=(8, 2))
-        join_box, _je = styled_entry(join_frame, address_var, font=self.f_body, width=32)
-        join_box.pack(anchor="w")
-        tk.Label(join_frame,
-                 text="Il clique HÉBERGER puis COPIER et t'envoie l'adresse.\n"
-                      "S'il utilise le relais : RetroArch → Netplay → actualise → rejoins son pseudo.",
-                 font=self.f_small, fg=TXT_DARK, bg=BG_DARK, justify="left").pack(anchor="w",
-                                                                                   pady=(4, 0))
+        ttk.Label(join_frame, text="Adresse donnée par ton ami :").pack(anchor="w", pady=(8, 2))
+        ttk.Entry(join_frame, textvariable=address_var, width=32).pack(anchor="w")
+        ttk.Label(join_frame,
+                  text="Il clique Héberger puis Copier et t'envoie l'adresse.\n"
+                       "S'il utilise le relais : RetroArch → Netplay → actualise → rejoins son pseudo.",
+                  style="Dim.TLabel", justify="left").pack(anchor="w", pady=(4, 0))
 
         def start() -> None:
             is_host = mode.get() == "host"
@@ -1050,111 +825,111 @@ class LauncherApp(tk.Tk):
                 )
             )
 
-        buttons = tk.Frame(body, bg=BG_DARK)
+        buttons = ttk.Frame(body)
         buttons.pack(fill="x", side="bottom", pady=(12, 4))
-        neon_label(buttons, "LANCER EN LIGNE", start, font=self.f_title_sm, fg=BG_DARK,
-                   bg=NEON_PURPLE, hover_fg=TXT, hover_bg=NEON_PINK, padx=16, pady=8).pack(side="right")
-        neon_label(buttons, "ANNULER", win.destroy, font=self.f_badge, fg=TXT_DIM,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=14, pady=8).pack(side="right", padx=8)
-        tk.Label(body,
-                 text="Netplay : idéal NES / SNES / Mega Drive / GBA / PSX · variable N64 · "
-                      "pas dispo DS / Wii / PSP.\nMême jeu et même core chez les deux — "
-                      "les ROMs se téléchargent toutes seules.",
-                 font=self.f_small, fg=TXT_DARK, bg=BG_DARK, justify="left").pack(anchor="w",
-                                                                                 pady=(6, 0))
+        ttk.Button(buttons, text="Lancer en ligne", command=start).pack(side="right")
+        ttk.Button(buttons, text="Annuler", command=win.destroy).pack(side="right", padx=8)
+        ttk.Label(body,
+                  text="Netplay : idéal NES / SNES / Mega Drive / GBA / PSX · variable N64 · "
+                       "pas dispo DS / Wii / PSP.\nMême jeu et même core chez les deux — "
+                       "les ROMs se téléchargent toutes seules.",
+                  style="Dim.TLabel", justify="left").pack(anchor="w", pady=(6, 0))
+        swap()
 
     # sauvegardes
     def _open_saves(self, game: dict[str, Any]) -> None:
         title = str(game.get("title") or game.get("file") or "?")
         system = game["_system"]
         roms_dir = str(self.config_data.get("roms_dir") or "") or None
-        win, body = self._dialog(f"SAUVEGARDES — {title}", 880, 620)
+        win, body = self._dialog(f"Sauvegardes — {title}", 900, 620)
 
         native = find_native(system)
         native_name = Path(native).name if native else ""
         target_dir, why = saves_mod.retroarch_save_dir()
 
-        tk.Label(body, text=f"Cible RetroArch : {target_dir if target_dir else '—'}",
-                 font=self.f_small, fg=NEON_CYAN if target_dir else RED, bg=BG_DARK,
-                 anchor="w", wraplength=820, justify="left").pack(fill="x")
-        tk.Label(body, text=why, font=self.f_small, fg=TXT_DARK, bg=BG_DARK,
-                 anchor="w", wraplength=820, justify="left").pack(fill="x")
+        ttk.Label(body, text=f"Cible RetroArch : {target_dir if target_dir else '—'}").pack(anchor="w")
+        ttk.Label(body, text=why, style="Dim.TLabel", wraplength=850,
+                  justify="left").pack(anchor="w")
         if native_name:
-            tk.Label(body, text=f"Émulateur natif détecté : {native_name}", font=self.f_small,
-                     fg=TXT_DIM, bg=BG_DARK, anchor="w").pack(fill="x")
+            ttk.Label(body, text=f"Émulateur natif détecté : {native_name}",
+                      style="Dim.TLabel").pack(anchor="w")
 
-        list_wrap = tk.Frame(body, bg=BG_DARK)
-        list_wrap.pack(fill="both", expand=True, pady=(10, 6))
-        listbox = tk.Listbox(list_wrap, font=self.f_small, bg=BTN_DARK, fg=TXT,
-                             selectbackground=NEON_ORANGE, selectforeground=BG_DARK,
-                             relief="flat", bd=0, highlightthickness=1,
-                             highlightbackground=BORDER_MID, activestyle="none",
-                             selectmode=tk.EXTENDED)
-        scroll = tk.Scrollbar(list_wrap, command=listbox.yview, width=10)
-        listbox.configure(yscrollcommand=scroll.set)
+        wrap = ttk.Frame(body)
+        wrap.pack(fill="both", expand=True, pady=(10, 6))
+        table = ttk.Treeview(wrap, columns=("source", "file", "size", "date"),
+                             show="headings", selectmode="extended", height=6)
+        for key, text, width, anchor in (
+            ("source", "Source", 150, "w"),
+            ("file", "Fichier", 430, "w"),
+            ("size", "Taille", 80, "e"),
+            ("date", "Date", 150, "w"),
+        ):
+            table.heading(key, text=text)
+            table.column(key, width=width, anchor=anchor)
+        scroll = ttk.Scrollbar(wrap, orient="vertical", command=table.yview)
+        table.configure(yscrollcommand=scroll.set)
         scroll.pack(side="right", fill="y")
-        listbox.pack(fill="both", expand=True)
+        table.pack(fill="both", expand=True)
 
-        note = tk.Label(body, text="", font=self.f_small, fg=TXT_DIM, bg=BG_DARK,
-                        anchor="w", wraplength=820, justify="left")
-        note.pack(fill="x", pady=(0, 6))
-
+        note = ttk.Label(body, text="", style="Dim.TLabel", wraplength=850, justify="left")
+        note.pack(anchor="w", pady=(0, 6))
         state: dict[str, list[saves_mod.SaveFile]] = {"files": []}
 
-        def show(message: str, color: str = TXT_DIM) -> None:
-            note.configure(text=message, fg=color)
+        def show(message: str, color: str = DIM) -> None:
+            note.configure(text=message, foreground=color)
 
         def refresh() -> None:
-            listbox.delete(0, "end")
+            table.delete(*table.get_children())
             state["files"] = saves_mod.find_saves(system, game["file"], roms_dir)
             home = str(Path.home())
-            for save in state["files"]:
+            for idx, save in enumerate(state["files"]):
                 shown = str(save.path).replace(home, "~", 1)
-                listbox.insert(
-                    "end",
-                    f"  {save.source} — {shown}  ({save.size_ko()} Ko, {save.date()})",
-                )
-            if not state["files"]:
-                listbox.insert("end", "  Aucune sauvegarde trouvée pour ce jeu.")
+                table.insert("", "end", iid=f"s{idx}",
+                             values=(save.source, shown, f"{save.size_ko()} Ko", save.date()))
+            if state["files"]:
+                table.selection_set("s0")
+                show("")
             else:
-                listbox.selection_set(0)
+                show("Aucune sauvegarde trouvée pour ce jeu.")
 
         def selected() -> list[saves_mod.SaveFile]:
-            return [state["files"][i] for i in listbox.curselection() if i < len(state["files"])]
+            out: list[saves_mod.SaveFile] = []
+            for iid in table.selection():
+                idx = int(iid[1:])
+                if 0 <= idx < len(state["files"]):
+                    out.append(state["files"][idx])
+            return out
 
         def do_retroarch() -> None:
             files = selected()
             if not files:
-                show("Sélectionne d'abord une sauvegarde dans la liste.", RED)
+                show("Sélectionne d'abord une sauvegarde dans la liste.", DANGER)
                 return
             try:
-                show(saves_mod.import_to_retroarch(system, game["file"], files), NEON_GREEN)
+                show(saves_mod.import_to_retroarch(system, game["file"], files), OK)
             except saves_mod.SaveError as exc:
-                show(str(exc), RED)
+                show(str(exc), DANGER)
             except Exception as exc:  # noqa: BLE001
-                show(f"Échec de la copie : {exc}", RED)
+                show(f"Échec de la copie : {exc}", DANGER)
             refresh()
 
         def do_native() -> None:
             files = selected()
             if not files:
-                show("Sélectionne d'abord une sauvegarde dans la liste.", RED)
+                show("Sélectionne d'abord une sauvegarde dans la liste.", DANGER)
                 return
             try:
-                show(saves_mod.import_to_native(system, game["file"], files[0], roms_dir),
-                     NEON_GREEN)
+                show(saves_mod.import_to_native(system, game["file"], files[0], roms_dir), OK)
             except saves_mod.SaveError as exc:
-                show(str(exc), RED)
+                show(str(exc), DANGER)
             except Exception as exc:  # noqa: BLE001
-                show(f"Échec de la copie : {exc}", RED)
+                show(f"Échec de la copie : {exc}", DANGER)
 
         def do_export() -> None:
             files = selected()
             if not files:
-                show("Sélectionne d'abord une sauvegarde dans la liste.", RED)
+                show("Sélectionne d'abord une sauvegarde dans la liste.", DANGER)
                 return
-            from tkinter import filedialog
-
             dest = filedialog.asksaveasfilename(
                 title="Exporter une copie de la sauvegarde",
                 initialfile=files[0].path.name,
@@ -1163,44 +938,38 @@ class LauncherApp(tk.Tk):
                 return
             try:
                 path = saves_mod.export_copy(files[0], Path(dest))
-                show(f"Copie exportée vers {path}", NEON_GREEN)
+                show(f"Copie exportée vers {path}", OK)
             except Exception as exc:  # noqa: BLE001
-                show(f"Échec de l'export : {exc}", RED)
+                show(f"Échec de l'export : {exc}", DANGER)
 
         def do_choose() -> None:
-            from tkinter import filedialog
-
             chosen = filedialog.askopenfilename(
                 title="Choisir un fichier de sauvegarde (export du navigateur, autre émulateur…)",
             )
             if not chosen:
                 return
-            state["files"].insert(0, saves_mod.SaveFile.from_path(Path(chosen), system))
-            listbox.insert(0, f"  choisi — {chosen}")
-            listbox.selection_clear(0, "end")
-            listbox.selection_set(0)
-            show("Fichier ajouté en tête de liste : tu peux l'importer vers RetroArch.")
+            save = saves_mod.SaveFile.from_path(Path(chosen), system)
+            state["files"].append(save)
+            iid = f"s{len(state['files']) - 1}"
+            home = str(Path.home())
+            shown = str(save.path).replace(home, "~", 1)
+            table.insert("", "end", iid=iid,
+                         values=(save.source, shown, f"{save.size_ko()} Ko", save.date()))
+            table.selection_set(iid)
+            show("Fichier ajouté : tu peux l'importer vers RetroArch.")
 
-        row = tk.Frame(body, bg=BG_DARK)
+        row = ttk.Frame(body)
         row.pack(fill="x")
-        neon_label(row, "IMPORTER VERS RETROARCH", do_retroarch, font=self.f_badge,
-                   fg=BG_DARK, bg=NEON_ORANGE, hover_bg=NEON_YELLOW, padx=14, pady=8).pack(side="left")
+        ttk.Button(row, text="Importer vers RetroArch", command=do_retroarch).pack(side="left")
         if native_name:
-            neon_label(row, f"VERS {native_name.upper()}", do_native, font=self.f_badge,
-                       fg=TXT, bg=NEON_PURPLE, hover_fg=BG_DARK, hover_bg=NEON_PINK,
-                       padx=14, pady=8).pack(side="left", padx=8)
-        neon_label(row, "EXPORTER UNE COPIE", do_export, font=self.f_badge, fg=TXT,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=12, pady=8).pack(side="left", padx=8)
-        neon_label(row, "CHOISIR UN FICHIER…", do_choose, font=self.f_badge, fg=TXT,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=12, pady=8).pack(side="left")
-        neon_label(row, "ACTUALISER", refresh, font=self.f_badge, fg=TXT_DIM,
-                   bg=BG_PANEL_HI, hover_bg=BORDER_MID, padx=12, pady=8).pack(side="right")
-
-        tk.Label(body,
-                 text="Seules les sauvegardes de jeu se transfèrent entre émulateurs, pas les états "
-                      "(savestates). Chaque copie garde l'ancienne version en .bak.",
-                 font=self.f_small, fg=TXT_DARK, bg=BG_DARK, anchor="w",
-                 wraplength=820, justify="left").pack(fill="x", pady=(8, 0))
+            ttk.Button(row, text=f"Vers {native_name}", command=do_native).pack(side="left", padx=6)
+        ttk.Button(row, text="Exporter une copie…", command=do_export).pack(side="left", padx=6)
+        ttk.Button(row, text="Choisir un fichier…", command=do_choose).pack(side="left")
+        ttk.Button(row, text="Actualiser", command=refresh).pack(side="right")
+        ttk.Label(body,
+                  text="Seules les sauvegardes de jeu se transfèrent entre émulateurs, pas les états "
+                       "(savestates). Chaque copie garde l'ancienne version en .bak.",
+                  style="Dim.TLabel", wraplength=850, justify="left").pack(anchor="w", pady=(8, 0))
         refresh()
 
     # fermeture
@@ -1216,13 +985,7 @@ class LauncherApp(tk.Tk):
 
 
 def run_gui() -> None:
-    from .theme import ensure_fonts, resolve_fonts
-
-    ensure_fonts()
-    probe = tk.Tk()
-    title_family, body_family = resolve_fonts(probe)
-    probe.destroy()
-    app = LauncherApp(title_family=title_family, body_family=body_family)
+    app = LauncherApp()
     app.mainloop()
 
 
