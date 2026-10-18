@@ -14,6 +14,7 @@ Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 ## Nouveautés v1.8.1
 
 - **Exécutables autonomes** : le launcher se télécharge en **`.exe` Windows** ou **binaire Linux** — Python n'est plus à installer chez le joueur (tout est embarqué). Les archives Python (.zip / .tar.gz) restent disponibles.
+- **Musique retirée** : le launcher ne joue plus la chiptune — il reste silencieux.
 - Avec l'exécutable, les liens `kirbyretro://` sont enregistrés directement vers le binaire (mêmes fonctions qu'avec les scripts).
 
 ## Nouveautés v1.8.0
@@ -264,5 +265,4 @@ L’émulation DS/N64 dans le navigateur (WASM) reste limitée. Un launcher nati
 ## Crédits
 
 - Code du site et du launcher : licence **MIT** — sources sur [github.com/Trimisdumb/kirby-retro](https://github.com/Trimisdumb/kirby-retro).
-- Chiptune : boucle 8-bit **générée localement** par le launcher (aucun fichier audio téléchargé ; s'active ou se coupe dans **Options → Musique**).
 - Jaquettes : récupérées de ton site et mises en cache dans `~/.cache/KirbyRetroLauncher/covers/` — rien n’est envoyé ailleurs.

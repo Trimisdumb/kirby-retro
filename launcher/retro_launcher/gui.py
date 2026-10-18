@@ -17,7 +17,6 @@ from .config import load_config, save_config
 from .covers import CoverManager
 from .detect import autofill, find_native, flatpak_native
 from .launch import LaunchError, launch_game, launch_netplay, local_rom_path
-from .music import MusicPlayer
 from .netplay import DEFAULT_PORT, candidate_addresses
 from .protocol import install_protocol
 
@@ -75,7 +74,6 @@ class LauncherApp(tk.Tk):
             str(self.config_data.get("site_url") or ""),
             str(self.config_data.get("roms_dir") or ""),
         )
-        self.music = MusicPlayer(self.config_data)
 
         self._rows: dict[str, dict[str, Any]] = {}
         self._thumbs: dict[str, tk.PhotoImage] = {}
@@ -84,12 +82,10 @@ class LauncherApp(tk.Tk):
         self._sort_col = "title"
         self._sort_rev = False
         self._busy = False
-        self._music_synced = False
 
         self._status = tk.StringVar(value="Chargement du catalogue…")
         self._count = tk.StringVar(value="")
         self._search = tk.StringVar()
-        self._music_var = tk.BooleanVar(value=bool(self.config_data.get("music", True)))
 
         self._setup_style()
         self._build_menu()
@@ -97,7 +93,6 @@ class LauncherApp(tk.Tk):
         self._build_list()
         self._build_statusbar()
 
-        threading.Thread(target=self._music_prepare, daemon=True).start()
         self.after(150, self.refresh_library)
         self.after(300, self._poll)
         self.bind("<F5>", lambda _e: self.refresh_library())
@@ -175,7 +170,6 @@ class LauncherApp(tk.Tk):
 
         options = tk.Menu(menubar, tearoff=0)
         options.add_command(label="Paramètres…", command=self.open_settings)
-        options.add_checkbutton(label="Musique", variable=self._music_var, command=self.toggle_music)
         options.add_separator()
         options.add_command(label="Installer le protocole kirbyretro://", command=self._install_protocol)
         options.add_command(label="Diagnostic…", command=self.open_doctor)
@@ -257,45 +251,9 @@ class LauncherApp(tk.Tk):
     def _set_status(self, text: str) -> None:
         self._status.set(text)
 
-    # musique
-    def _music_prepare(self) -> None:
-        try:
-            self.music.prepare()
-        except Exception:  # noqa: BLE001
-            self.music.prepare_done = True
-
-    def _sync_music(self) -> None:
-        if not self.music.prepare_done:
-            return
-        if not self._music_synced:
-            self._music_synced = True
-            if self.music.problem and not self.music.usable:
-                self._set_status(self.music.problem)
-            elif self.music.enabled:
-                self.music.start()
-        elif self.music.enabled and self.music.usable:
-            self.music.start()
-        self._music_var.set(bool(self.music.enabled))
-
-    def toggle_music(self) -> None:
-        if not self.music.prepare_done:
-            self._set_status("Chiptune en préparation…")
-            self._music_var.set(bool(self.music.enabled))
-            return
-        if not self.music.usable:
-            self._set_status(self.music.problem or "Lecteur audio indisponible")
-            self._music_var.set(bool(self.music.enabled))
-            return
-        on = self.music.toggle()
-        self.config_data["music"] = on
-        save_config(self.config_data)
-        self._music_var.set(on)
-        self._set_status("Musique " + ("activée" if on else "coupée"))
-
     # boucle de fond
     def _poll(self) -> None:
         self._poll_covers()
-        self._sync_music()
         self.after(300, self._poll)
 
     def _poll_covers(self) -> None:
@@ -602,7 +560,6 @@ class LauncherApp(tk.Tk):
         roms_var = tk.StringVar(value=str(cfg.get("roms_dir") or ""))
         ra_var = tk.StringVar(value=str((cfg.get("retroarch") or {}).get("path") or ""))
         cores_var = tk.StringVar(value=str((cfg.get("retroarch") or {}).get("cores_dir") or ""))
-        music_var = tk.StringVar(value=str(cfg.get("music_file") or ""))
 
         def browse_row(row: int, label: str, variable: tk.StringVar, title: str) -> None:
             ttk.Label(body, text=label).grid(row=row, column=0, sticky="w", pady=5)
@@ -620,45 +577,35 @@ class LauncherApp(tk.Tk):
         browse_row(1, "Dossier ROMs", roms_var, "Choisis le dossier des ROMs")
         browse_row(2, "RetroArch", ra_var, "Choisis le dossier de RetroArch")
         browse_row(3, "Dossier cores", cores_var, "Choisis le dossier des cores libretro")
-        browse_row(4, "Musique perso", music_var, "Choisis un .wav/.ogg/.mp3 (vide = chiptune)")
 
         download_var = tk.BooleanVar(value=bool(cfg.get("download_missing_roms", True)))
         ttk.Checkbutton(body, text="Télécharger les ROMs manquantes depuis le site",
-                        variable=download_var).grid(row=5, column=0, columnspan=3,
+                        variable=download_var).grid(row=4, column=0, columnspan=3,
                                                     sticky="w", pady=(10, 2))
         auto_var = tk.BooleanVar(value=bool(cfg.get("auto_sync_saves", True)))
         ttk.Checkbutton(body,
                         text="Importer automatiquement les sauvegardes des émulateurs natifs au lancement",
-                        variable=auto_var).grid(row=6, column=0, columnspan=3,
+                        variable=auto_var).grid(row=5, column=0, columnspan=3,
                                                 sticky="w", pady=(2, 2))
         ttk.Label(body, text="Le pseudo et le port netplay se règlent dans « Jouer en ligne ».",
-                  style="Dim.TLabel").grid(row=7, column=0, columnspan=3, sticky="w")
+                  style="Dim.TLabel").grid(row=6, column=0, columnspan=3, sticky="w")
 
         def save() -> None:
             cfg["site_url"] = site_var.get().strip() or "https://retro.kirbytrim.buzz"
             cfg["roms_dir"] = roms_var.get().strip()
             cfg["download_missing_roms"] = bool(download_var.get())
             cfg["auto_sync_saves"] = bool(auto_var.get())
-            cfg["music_file"] = music_var.get().strip()
             cfg.setdefault("retroarch", {})
             cfg["retroarch"]["path"] = ra_var.get().strip()
             cfg["retroarch"]["cores_dir"] = cores_var.get().strip()
             save_config(cfg)
             self.covers.update_config(cfg["site_url"], cfg["roms_dir"])
-            try:
-                self._music_synced = False
-                self.music.stop()
-                self.music.prepare()
-                self.music.prepare_done = True
-                self._sync_music()
-            except Exception:  # noqa: BLE001
-                pass
             win.destroy()
             self._set_status("Paramètres enregistrés")
             self.refresh_library()
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        buttons.grid(row=7, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         ttk.Button(buttons, text="Diagnostic…", command=self.open_doctor).pack(side="left")
         ttk.Button(buttons, text="Associer kirbyretro://",
                    command=self._install_protocol).pack(side="left", padx=8)
@@ -994,10 +941,6 @@ class LauncherApp(tk.Tk):
 
     # fermeture
     def on_close(self) -> None:
-        try:
-            self.music.close()
-        except Exception:  # noqa: BLE001
-            pass
         try:
             self.destroy()
         except tk.TclError:

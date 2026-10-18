@@ -48,8 +48,6 @@ def default_config() -> dict[str, Any]:
         "emulators": {},
         "prefer_native_for": ["nds", "n64", "psx"],
         "netplay": {"nickname": "", "port": 55435, "last_host": "", "use_relay": False},
-        "music": True,
-        "music_file": "",
     }
 
 
