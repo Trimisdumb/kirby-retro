@@ -61,16 +61,45 @@ object Emulators {
     /**
      * Vrai si cette version de RetroArch peut lire le dossier des ROMs.
      *
-     * Android 11+ : les versions publiées sur le Play Store n'ont pas la permission
-     * « tous les fichiers » — elles ne voient que leur propre dossier, et un jeu
-     * lancé depuis le launcher resterait noir. Cette version se repère dans le
-     * paquet : la permission demandée y est déclarée, ou non.
+     * Android 11+ : les versions publiées sur le Play Store n'ont accès qu'à leur
+     * propre dossier — un jeu lancé depuis le launcher resterait noir. Les versions
+     * officielles lisent le stockage partagé de deux façons : la permission « tous
+     * les fichiers » (builds récents), ou le stockage « hérité » des applis qui
+     * ciblent Android 10 ou moins — c'est le cas des versions 1.22 officielles.
+     * Tout le reste est un build du Play Store.
      */
     fun canReadSharedStorage(context: Context, packageName: String): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return true
-        val info = packageInfo(context.packageManager, packageName) ?: return false
-        return info.requestedPermissions
-            ?.contains(Manifest.permission.MANAGE_EXTERNAL_STORAGE) == true
+        val info = packageInfo(context.packageManager, packageName) ?: return true
+        if (info.requestedPermissions
+                ?.contains(Manifest.permission.MANAGE_EXTERNAL_STORAGE) == true) {
+            return true
+        }
+        return (info.applicationInfo?.targetSdkVersion ?: 0) <= Build.VERSION_CODES.Q
+    }
+
+    /**
+     * Vrai si RetroArch a déjà le droit de lire le stockage partagé.
+     *
+     * C'est RetroArch qui demande ce droit, et seulement au lancement de son menu
+     * (l'appli launcher de RetroArch) : lancé directement sur une ROM, il ne le
+     * demande pas — sans autorisation, le jeu s'ouvrirait sur un écran noir.
+     */
+    fun hasStorageAccess(context: Context, packageName: String): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+        val manager = context.packageManager
+        val info = packageInfo(manager, packageName) ?: return true
+        if (info.requestedPermissions
+                ?.contains(Manifest.permission.MANAGE_EXTERNAL_STORAGE) == true) {
+            // Builds récents : RetroArch montre lui-même la demande « tous les fichiers ».
+            return true
+        }
+        return try {
+            manager.checkPermission(Manifest.permission.READ_EXTERNAL_STORAGE, packageName) ==
+                PackageManager.PERMISSION_GRANTED
+        } catch (error: Exception) {
+            true
+        }
     }
 
     /** Nom affiché de l'appli (« RetroArch Plus »), pour les messages. */
@@ -138,12 +167,21 @@ object Emulators {
         return intent
     }
 
-    /** Ouvre RetroArch sur son menu, sans jeu (il peut y demander ses autorisations). */
-    fun menuIntent(packageName: String): Intent {
+    /**
+     * Ouvre RetroArch sur son menu, sans jeu — comme un appui sur son icône.
+     *
+     * C'est le seul passage où RetroArch demande son autorisation d'accès aux
+     * fichiers : une ROM arrivée d'un launcher ouvre le jeu directement.
+     */
+    fun menuIntent(context: Context, packageName: String): Intent {
+        val fromLauncher = context.packageManager.getLaunchIntentForPackage(packageName)
+        if (fromLauncher != null) {
+            fromLauncher.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return fromLauncher
+        }
         val intent = Intent(Intent.ACTION_MAIN)
         intent.component = ComponentName(packageName, ACTIVITY)
-        intent.addCategory(Intent.CATEGORY_LAUNCHER)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return intent
     }
 

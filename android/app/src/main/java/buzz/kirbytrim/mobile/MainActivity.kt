@@ -282,6 +282,8 @@ class MainActivity : AppCompatActivity() {
             retroarch == null -> "RetroArch introuvable — installe-le pour lancer les jeux"
             !Emulators.canReadSharedStorage(this, retroarch) ->
                 "RetroArch du Play Store : ne peut pas lire les ROMs — utilise la version officielle"
+            !Emulators.hasStorageAccess(this, retroarch) ->
+                "RetroArch : accès aux fichiers à autoriser — ouvre RetroArch depuis son icône"
             emulator.coresKnown -> "RetroArch : ${emulator.cores.size} cores installés"
             else -> "RetroArch détecté — détection des cores…"
         }

@@ -153,6 +153,18 @@ class GameSheet(
             tellRetroArchCannotRead(packageName)
             return
         }
+        // Version officielle d'Android 11+ jamais ouverte : Android ne lui a pas
+        // encore donné l'accès aux fichiers — RetroArch ne demande ce droit qu'au
+        // lancement de son menu, pas quand une ROM arrive d'un launcher.
+        if (!Emulators.hasStorageAccess(activity, packageName)) {
+            tellRetroArchNeedsStorage(packageName) { continueLaunch(packageName, rom) }
+            return
+        }
+        continueLaunch(packageName, rom)
+    }
+
+    /** Choix du core, puis lancement. */
+    private fun continueLaunch(packageName: String, rom: File) {
         if (prefs.letRetroarchChooseCore) {
             start(packageName, rom, null)
             return
@@ -236,6 +248,26 @@ class GameSheet(
             .show()
     }
 
+    /**
+     * RetroArch officiel installé, mais Android ne lui a pas encore donné l'accès
+     * aux fichiers : sans cette autorisation, le jeu s'ouvrirait sur un écran noir.
+     */
+    private fun tellRetroArchNeedsStorage(packageName: String, onAnyway: () -> Unit) {
+        val label = Emulators.label(activity, packageName)
+        AlertDialog.Builder(activity)
+            .setTitle("Autorise l'accès aux fichiers dans RetroArch")
+            .setMessage(
+                "Android n'a pas encore autorisé $label à lire « ${prefs.romsDir} » : " +
+                    "sans ça, les jeux se lancent sur un écran noir.\n\n" +
+                    "Ouvre RetroArch (son icône), accepte la demande d'accès aux " +
+                    "fichiers, puis relance le jeu ici."
+            )
+            .setPositiveButton("Ouvrir RetroArch") { _, _ -> openRetroArch(packageName) }
+            .setNeutralButton("Lancer quand même") { _, _ -> onAnyway() }
+            .setNegativeButton(R.string.button_close, null)
+            .show()
+    }
+
     private fun tellNoCoreInstalled(packageName: String) {
         AlertDialog.Builder(activity)
             .setTitle("Aucun core dans RetroArch")
@@ -279,7 +311,7 @@ class GameSheet(
 
     private fun openRetroArch(packageName: String) {
         try {
-            activity.startActivity(Emulators.menuIntent(packageName))
+            activity.startActivity(Emulators.menuIntent(activity, packageName))
         } catch (error: Exception) {
             toast("RetroArch n'a pas répondu")
         }

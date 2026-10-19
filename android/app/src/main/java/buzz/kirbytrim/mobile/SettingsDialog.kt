@@ -80,6 +80,9 @@ class SettingsDialog(
                 !Emulators.canReadSharedStorage(activity, packageName) ->
                     "RetroArch : ${Emulators.label(activity, packageName)} — version du Play " +
                         "Store, ne peut pas lire les ROMs (écran noir au lancement)"
+                !Emulators.hasStorageAccess(activity, packageName) ->
+                    "RetroArch : ${Emulators.label(activity, packageName)} — accès aux " +
+                        "fichiers à autoriser (ouvre RetroArch depuis son icône)"
                 else -> "RetroArch : ${Emulators.label(activity, packageName)}"
             }
         )
