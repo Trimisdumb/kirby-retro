@@ -53,9 +53,23 @@ LaunchOutcome tryNative(const QJsonObject &config, const QString &system, const 
 LaunchOutcome tryRetroarch(const QJsonObject &config, const QString &system, const QString &romPath) {
     LaunchOutcome outcome;
     const QJsonObject retroarch = config.value("retroarch").toObject();
-    const QString retroarchPath = retroarch.value("path").toString().trimmed();
-    if (!retroarchOk(retroarchPath)) {
-        return outcome;  // RetroArch introuvable → essayer l'autre stratégie
+    const QString retroarchPath = retroarchExecutable(retroarch.value("path").toString());
+    if (retroarchPath.isEmpty()) {
+        // Message utile : ce qui est configuré, ce qui a été trouvé, quoi corriger.
+        const QString configured = retroarch.value("path").toString().trimmed();
+        const QString detected = findRetroarch();
+        outcome.message =
+            configured.isEmpty()
+                ? QObject::tr("RetroArch n'est pas configuré.\n\n"
+                              "Installe RetroArch officiel, ou indique « retroarch.exe » dans "
+                              "Paramètres — « Aide → Diagnostic… » liste ce que le launcher cherche.")
+                : QObject::tr("RetroArch est introuvable à l'emplacement configuré :\n%1\n\n"
+                              "Paramètres → RetroArch : choisis « retroarch.exe ».")
+                      .arg(configured);
+        if (!detected.isEmpty()) {
+            outcome.message += QObject::tr("\n\nDétecté : %1").arg(detected);
+        }
+        return outcome;  // on essaie quand même l'émulateur natif
     }
     const QString core = resolveCorePath(retroarch.value("cores_dir").toString(), system);
     if (core.isEmpty()) {

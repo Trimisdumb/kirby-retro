@@ -1,10 +1,14 @@
 #include "mainwindow.h"
 
 #include <QAction>
+#include <QApplication>
+#include <QClipboard>
 #include <QComboBox>
+#include <QDialog>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QIcon>
 #include <QLabel>
@@ -13,15 +17,19 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QNetworkReply>
+#include <QPlainTextEdit>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QTimer>
 #include <QToolBar>
+#include <QVBoxLayout>
 
 #include "app_config.h"
 #include "covers.h"
+#include "detect.h"
 #include "launch.h"
 #include "settingsdialog.h"
 
@@ -126,14 +134,16 @@ void MainWindow::buildMenus() {
     connect(settings, &QAction::triggered, this, &MainWindow::openSettings);
 
     QMenu *helpMenu = menuBar()->addMenu(tr("&Aide"));
+    QAction *diagnostic = helpMenu->addAction(tr("Diagnostic…"));
+    connect(diagnostic, &QAction::triggered, this, &MainWindow::showDiagnostic);
     QAction *about = helpMenu->addAction(tr("À propos"));
     connect(about, &QAction::triggered, this, [this]() {
         QMessageBox::about(this, tr("À propos"),
-                           tr("<b>Kirby Retro Launcher</b> — version C++ / Qt %1<br>"
-                              "%2 jeux dans la bibliothèque.<br><br>"
-                              "Portage expérimental du launcher Python : sauvegardes et "
-                              "netplay arrivent dans une prochaine version.")
-                               .arg(QT_VERSION_STR)
+                           tr("<b>Kirby Retro Launcher</b> — version %1 (C++ / Qt %2)<br>"
+                              "%3 jeux dans la bibliothèque.<br><br>"
+                              "Portage du launcher Python : sauvegardes et netplay arrivent "
+                              "dans une prochaine version.")
+                               .arg(QApplication::applicationVersion(), QT_VERSION_STR)
                                .arg(m_library.totalGames));
     });
 }
@@ -404,4 +414,30 @@ void MainWindow::openSettings() {
 
 void MainWindow::setStatus(const QString &text) {
     statusBar()->showMessage(text);
+}
+
+/// Ce que le launcher a trouvé (RetroArch, cores, émulateurs) — à copier en cas de souci.
+void MainWindow::showDiagnostic() {
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Diagnostic"));
+
+    auto *text = new QPlainTextEdit(diagnosticReport(m_config), &dialog);
+    text->setReadOnly(true);
+    text->setMinimumSize(720, 460);
+
+    auto *copy = new QPushButton(tr("Copier"), &dialog);
+    connect(copy, &QPushButton::clicked, text,
+            [text]() { QGuiApplication::clipboard()->setText(text->toPlainText()); });
+    auto *close = new QPushButton(tr("Fermer"), &dialog);
+    connect(close, &QPushButton::clicked, &dialog, &QDialog::accept);
+
+    auto *buttons = new QHBoxLayout;
+    buttons->addStretch(1);
+    buttons->addWidget(copy);
+    buttons->addWidget(close);
+
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->addWidget(text);
+    layout->addLayout(buttons);
+    dialog.exec();
 }

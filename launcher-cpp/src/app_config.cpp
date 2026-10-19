@@ -108,13 +108,26 @@ void autofill(QJsonObject &config) {
     }
 
     QJsonObject retroarch = config.value("retroarch").toObject();
+    // Chemin noté mais devenu invalide (RetroArch déplacé, désinstallé…) :
+    // on redétecte plutôt que d'échouer au lancement.
+    if (!retroarch.value("path").toString().isEmpty() &&
+        retroarchExecutable(retroarch.value("path").toString()).isEmpty()) {
+        retroarch["path"] = QString();
+    }
     if (retroarch.value("path").toString().isEmpty()) {
         const QString found = findRetroarch();
         if (!found.isEmpty()) {
             retroarch["path"] = found;
         }
+    } else {
+        // Un dossier saisi à la main → on garde le chemin de l'exécutable.
+        const QString exe = retroarchExecutable(retroarch.value("path").toString());
+        if (!exe.isEmpty() && !isFlatpak(exe)) {
+            retroarch["path"] = exe;
+        }
     }
-    if (retroarch.value("cores_dir").toString().isEmpty()) {
+    if (retroarch.value("cores_dir").toString().isEmpty() ||
+        !QDir(retroarch.value("cores_dir").toString()).exists()) {
         const QString cores = defaultCoresDir(retroarch.value("path").toString());
         if (!cores.isEmpty()) {
             retroarch["cores_dir"] = cores;

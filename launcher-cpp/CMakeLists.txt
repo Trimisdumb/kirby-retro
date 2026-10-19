@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(kirby-retro-launcher-cpp VERSION 0.1.0 LANGUAGES CXX)
+project(kirby-retro-launcher-cpp VERSION 0.2.0 LANGUAGES CXX)
 
 # Portage C++/Qt 6 du launcher (version Python dans ../launcher).
 # Bibliothèque, jaquettes, téléchargement des ROMs, détection RetroArch
@@ -33,3 +33,4 @@ add_executable(kirby-retro-launcher-cpp
 
 target_include_directories(kirby-retro-launcher-cpp PRIVATE src)
 target_link_libraries(kirby-retro-launcher-cpp PRIVATE Qt6::Widgets Qt6::Network)
+target_compile_definitions(kirby-retro-launcher-cpp PRIVATE KIRBY_VERSION="${PROJECT_VERSION}")

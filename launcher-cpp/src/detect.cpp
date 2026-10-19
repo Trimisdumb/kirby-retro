@@ -1,12 +1,17 @@
 #include "detect.h"
 
+#include <QCoreApplication>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
 #include <QObject>
 #include <QProcess>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QTextStream>
+
+#include "app_config.h"
 
 const QHash<QString, QStringList> RETROARCH_CORES = {
     {"nes", {"fceumm_libretro", "mesen2_libretro", "nestopia_libretro", "mesen-s_libretro"}},
@@ -87,48 +92,103 @@ bool flatpakInstalled() {
     return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
 }
 
-QString cfgLibretroDirectoryIn(const QString &cfgPath) {
-    QFile file(cfgPath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return {};
-    }
-    QTextStream stream(&file);
-    while (!stream.atEnd()) {
-        const QString line = stream.readLine().trimmed();
-        if (!line.startsWith(QStringLiteral("libretro_directory"))) {
-            continue;
-        }
-        const int equal = line.indexOf(QLatin1Char('='));
-        if (equal < 0) {
-            continue;
-        }
-        QString value = line.mid(equal + 1).trimmed();
-        if (value.length() >= 2 && value.startsWith(QLatin1Char('"')) && value.endsWith(QLatin1Char('"'))) {
-            value = value.mid(1, value.length() - 2);
-        }
-        if (value.startsWith(QStringLiteral("~/"))) {
-            value = homeDir() + value.mid(1);
-        }
-        const QFileInfo info(value);
-        if (info.isDir()) {
-            return info.absoluteFilePath();
-        }
-    }
-    return {};
+// Dossier de base de RetroArch (« C:/RetroArch-Win64 ») pour un chemin donné.
+QString directoryOf(const QString &path) {
+    const QFileInfo info(path.trimmed());
+    return info.isDir() ? info.absoluteFilePath() : info.absolutePath();
 }
 
-QString cfgLibretroDirectory() {
+// Remplace %APPDATA%, %LOCALAPPDATA%… et $HOME dans une valeur de retroarch.cfg.
+QString expandVariables(QString value) {
+    static const char *KEYS[] = {"APPDATA", "LOCALAPPDATA", "USERPROFILE", "ProgramFiles", "HOME"};
+    for (const char *key : KEYS) {
+        const QString variable = qEnvironmentVariable(key);
+        if (variable.isEmpty()) {
+            continue;
+        }
+        const QString name = QString::fromLatin1(key);
+        value.replace(QLatin1Char('%') + name + QLatin1Char('%'), variable, Qt::CaseInsensitive);
+        value.replace(QLatin1Char('$') + name, variable);
+    }
+    return value;
+}
+
+// Interprète une valeur de chemin de retroarch.cfg : « ~/… », « %APPDATA%\… »,
+// « :/cores » (à côté de l'exécutable) ou chemin relatif — sans oublier « default ».
+QString resolveCfgPath(const QString &raw, const QString &exeDir) {
+    QString value = expandVariables(raw.trimmed());
+    if (value.isEmpty() || value == QLatin1String("default") || value == QLatin1String(":") ||
+        value == QLatin1String(":/")) {
+        return {};
+    }
+    if (value.startsWith(QLatin1Char(':'))) {
+        while (value.startsWith(QLatin1Char(':')) || value.startsWith(QLatin1Char('/'))) {
+            value.remove(0, 1);
+        }
+        return exeDir.isEmpty() ? QString() : QDir(exeDir).filePath(value);
+    }
+    if (value.startsWith(QLatin1Char('~'))) {
+        value = homeDir() + value.mid(1);
+    }
+    if (!value.isEmpty() && !QFileInfo(value).isAbsolute() && !exeDir.isEmpty()) {
+        value = QDir(exeDir).filePath(value);
+    }
+    return QDir::cleanPath(value);
+}
+
+// Fichiers retroarch.cfg à consulter (ceux que RetroArch écrit sur chaque système).
+QStringList cfgCandidates(const QString &retroarchPath) {
     const QString home = homeDir();
-    const QStringList candidates = {
-        home + "/.config/retroarch/retroarch.cfg",
-        home + "/.retroarch/retroarch.cfg",
-        home + "/.var/app/" + FLATPAK_ID + "/config/retroarch/retroarch.cfg",
-        home + "/snap/retroarch/current/.config/retroarch/retroarch.cfg",
-    };
-    for (const QString &path : candidates) {
-        const QString found = cfgLibretroDirectoryIn(path);
-        if (!found.isEmpty()) {
-            return found;
+    QStringList paths;
+    if (!retroarchPath.trimmed().isEmpty()) {
+        paths << directoryOf(retroarchPath) + "/retroarch.cfg";
+    }
+    paths << home + "/.config/retroarch/retroarch.cfg"
+          << home + "/.retroarch/retroarch.cfg"
+          << home + "/.var/app/" + FLATPAK_ID + "/config/retroarch/retroarch.cfg"
+          << home + "/snap/retroarch/current/.config/retroarch/retroarch.cfg";
+#ifdef Q_OS_WIN
+    const QString appData = qEnvironmentVariable("APPDATA");
+    const QString localAppData = qEnvironmentVariable("LOCALAPPDATA");
+    if (!appData.isEmpty()) {
+        paths << appData + "/RetroArch/retroarch.cfg";
+    }
+    if (!localAppData.isEmpty()) {
+        paths << localAppData + "/RetroArch/retroarch.cfg";
+    }
+#endif
+    return paths;
+}
+
+// Dossier de cores déclaré par RetroArch lui-même (retroarch.cfg → libretro_directory).
+QString cfgLibretroDirectory(const QString &retroarchPath) {
+    const QString exeDir =
+        retroarchPath.trimmed().isEmpty() ? QString() : directoryOf(retroarchPath);
+    for (const QString &path : cfgCandidates(retroarchPath)) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            continue;
+        }
+        QTextStream stream(&file);
+        while (!stream.atEnd()) {
+            const QString line = stream.readLine().trimmed();
+            if (!line.startsWith(QStringLiteral("libretro_directory"))) {
+                continue;
+            }
+            const int equal = line.indexOf(QLatin1Char('='));
+            if (equal < 0) {
+                continue;
+            }
+            QString value = line.mid(equal + 1).trimmed();
+            if (value.length() >= 2 && value.startsWith(QLatin1Char('"')) &&
+                value.endsWith(QLatin1Char('"'))) {
+                value = value.mid(1, value.length() - 2);
+            }
+            const QString resolved = resolveCfgPath(value, exeDir);
+            const QFileInfo info(resolved);
+            if (!resolved.isEmpty() && info.isDir()) {
+                return info.absoluteFilePath();
+            }
         }
     }
     return {};
@@ -150,15 +210,39 @@ bool isFlatpak(const QString &retroarchPath) {
     return retroarchPath.trimmed().startsWith(QStringLiteral("flatpak"));
 }
 
-bool retroarchOk(const QString &retroarchPath) {
-    const QString value = retroarchPath.trimmed();
+QString retroarchExecutable(const QString &path) {
+    const QString value = path.trimmed();
     if (value.isEmpty()) {
-        return false;
+        return {};
     }
     if (isFlatpak(value)) {
-        return !QStandardPaths::findExecutable(QStringLiteral("flatpak")).isEmpty();
+        return QStandardPaths::findExecutable(QStringLiteral("flatpak")).isEmpty() ? QString()
+                                                                                  : value;
     }
-    return QFileInfo(value).isFile();
+    const QFileInfo info(value);
+    if (info.isFile()) {
+        return info.absoluteFilePath();
+    }
+    // Un dossier est accepté : l'utilisateur a pu choisir « C:\RetroArch-Win64 »
+    // plutôt que retroarch.exe — on y cherche l'exécutable.
+    if (info.isDir()) {
+        const QStringList names = {
+            QStringLiteral("retroarch.exe"),
+            QStringLiteral("retroarch"),
+            QStringLiteral("RetroArch.AppImage"),
+        };
+        for (const QString &name : names) {
+            const QString candidate = QDir(info.absoluteFilePath()).filePath(name);
+            if (QFileInfo(candidate).isFile()) {
+                return candidate;
+            }
+        }
+    }
+    return {};
+}
+
+bool retroarchOk(const QString &retroarchPath) {
+    return !retroarchExecutable(retroarchPath).isEmpty();
 }
 
 QString findRetroarch() {
@@ -178,12 +262,38 @@ QString findRetroarch() {
         QStringLiteral("/snap/bin/retroarch"),
     };
 #ifdef Q_OS_WIN
-    const QString programFiles = qEnvironmentVariable("ProgramFiles");
-    const QString localAppData = qEnvironmentVariable("LOCALAPPDATA");
-    candidates << programFiles + "/RetroArch/retroarch.exe"
-               << programFiles + "/RetroArch-Win64/retroarch.exe"
-               << localAppData + "/Programs/RetroArch/retroarch.exe";
+    // L'installateur officiel de retroarch.com se pose par défaut dans
+    // « C:\RetroArch-Win64 » : on balaie les dossiers de base classiques, la
+    // racine du disque C: et le voisinage du launcher (version portable).
+    QStringList roots;
+    for (const char *key : {"ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA", "USERPROFILE",
+                            "APPDATA"}) {
+        const QString value = qEnvironmentVariable(key);
+        if (!value.isEmpty()) {
+            roots << value;
+        }
+    }
+    roots << home << QStringLiteral("C:/");
+    const QStringList names = {
+        QStringLiteral("RetroArch/retroarch.exe"),
+        QStringLiteral("RetroArch-Win64/retroarch.exe"),
+        QStringLiteral("Steam/steamapps/common/RetroArch/retroarch.exe"),
+        QStringLiteral("Programs/RetroArch/retroarch.exe"),
+    };
+    for (const QString &root : roots) {
+        for (const QString &name : names) {
+            candidates << root + QLatin1Char('/') + name;
+        }
+    }
+    if (QCoreApplication::instance()) {
+        const QString beside = QCoreApplication::applicationDirPath();
+        candidates << beside + "/retroarch/retroarch.exe" << beside + "/retroarch.exe";
+    }
 #endif
+    // Affichage et lancement avec les séparateurs du système (Windows : « \ »).
+    for (QString &path : candidates) {
+        path = QDir::toNativeSeparators(path);
+    }
     for (const QString &path : candidates) {
         if (QFileInfo(path).isFile()) {
             return path;
@@ -197,15 +307,21 @@ QStringList coresDirs(const QString &retroarchPath) {
     QStringList dirs;
     if (isFlatpak(retroarchPath)) {
         dirs << flatpakCoresDir();
-    } else if (!retroarchPath.isEmpty() && QFileInfo(retroarchPath).isFile()) {
-        dirs << QFileInfo(retroarchPath).absolutePath() + "/cores";
+    } else if (!retroarchPath.trimmed().isEmpty()) {
+        // À côté de l'exécutable : standard portable (Windows inclus).
+        dirs << directoryOf(retroarchPath) + "/cores";
     }
-    const QString cfgDir = cfgLibretroDirectory();
+    const QString cfgDir = cfgLibretroDirectory(retroarchPath);
     if (!cfgDir.isEmpty()) {
         dirs << cfgDir;
     }
 #ifdef Q_OS_WIN
-    dirs << qEnvironmentVariable("APPDATA") + "/RetroArch/cores";
+    for (const char *key : {"APPDATA", "LOCALAPPDATA"}) {
+        const QString value = qEnvironmentVariable(key);
+        if (!value.isEmpty()) {
+            dirs << value + "/RetroArch/cores";
+        }
+    }
 #else
     dirs << home + "/.config/retroarch/cores"
          << home + "/.retroarch/cores"
@@ -301,4 +417,81 @@ QStringList retroarchCommand(const QString &retroarchPath) {
                 QString::fromLatin1(FLATPAK_ID)};
     }
     return {retroarchPath};
+}
+
+QString diagnosticReport(const QJsonObject &config) {
+    const QJsonObject retroarch = config.value("retroarch").toObject();
+    const QString configured = retroarch.value("path").toString().trimmed();
+    const QString coresConfigured = retroarch.value("cores_dir").toString().trimmed();
+    const QString exe = retroarchExecutable(configured);
+    const QString detected = findRetroarch();
+    // Chemins affichés avec les séparateurs du système (Windows : « \ »).
+    const auto native = [](const QString &path) { return QDir::toNativeSeparators(path); };
+
+    QStringList lines;
+    lines << QStringLiteral("Kirby Retro Launcher — diagnostic");
+#ifdef KIRBY_VERSION
+    lines << QStringLiteral("Version : ") + QString::fromLatin1(KIRBY_VERSION);
+#endif
+    lines << QStringLiteral("Système : ") + QSysInfo::prettyProductName() + QStringLiteral(" (") +
+                 QSysInfo::currentCpuArchitecture() + QLatin1Char(')');
+    lines << QStringLiteral("Configuration : ") + native(configPath());
+    lines << QStringLiteral("Site : ") + config.value("site_url").toString();
+    lines << QStringLiteral("Dossier ROMs : ") + native(config.value("roms_dir").toString());
+    lines << QString();
+
+    lines << QStringLiteral("RetroArch choisi : ") +
+                 (exe.isEmpty() ? QStringLiteral("introuvable — à corriger dans Paramètres (valeur : ") +
+                                      native(configured) + QStringLiteral(")")
+                                : native(exe));
+    lines << QStringLiteral("Détecté automatiquement : ") +
+                 (detected.isEmpty() ? QStringLiteral("(rien trouvé)") : native(detected));
+    lines << QString();
+
+    const QStringList dirs = coresDirs(exe.isEmpty() ? configured : exe);
+    lines << QStringLiteral("Dossiers de cores :");
+    if (dirs.isEmpty()) {
+        lines << QStringLiteral("  · (aucun dossier trouvé)");
+    }
+    for (const QString &dir : dirs) {
+        lines << QStringLiteral("  · ") + native(dir);
+    }
+    if (!coresConfigured.isEmpty()) {
+        lines << QStringLiteral("Dossier choisi à la main : ") + native(coresConfigured) +
+                     (QDir(coresConfigured).exists() ? QStringLiteral(" (ok)")
+                                                     : QStringLiteral(" (introuvable)"));
+    }
+    lines << QString();
+
+    lines << QStringLiteral("Cores par console :");
+    QStringList systems = RETROARCH_CORES.keys();
+    systems.sort();
+    for (const QString &system : systems) {
+        const QString core = resolveCorePath(coresConfigured, system);
+        lines << QStringLiteral("  · ") + system + QStringLiteral(" : ") +
+                     (core.isEmpty() ? QStringLiteral("(absent)") : QFileInfo(core).fileName());
+    }
+    lines << QString();
+
+    const QJsonObject emulators = config.value("emulators").toObject();
+    QStringList nativeSystems = NATIVE_HINTS.keys();
+    nativeSystems.sort();
+    QStringList nativeLines;
+    for (const QString &system : nativeSystems) {
+        const QString chosen = emulators.value(system).toObject().value("path").toString();
+        const QString found = findNative(system);
+        if (chosen.isEmpty() && found.isEmpty()) {
+            continue;
+        }
+        nativeLines << QStringLiteral("  · ") + system + QStringLiteral(" : ") +
+                           (chosen.isEmpty() ? QStringLiteral("(non configuré)") : chosen) +
+                           (found.isEmpty() ? QString()
+                                            : QStringLiteral(" — détecté : ") + found);
+    }
+    lines << QStringLiteral("Émulateurs natifs :");
+    lines << (nativeLines.isEmpty() ? QStringLiteral("  · (aucun)") : nativeLines.join(QLatin1Char('\n')));
+    lines << QString();
+    lines << QStringLiteral("Configuration complète :");
+    lines << QString::fromUtf8(QJsonDocument(config).toJson(QJsonDocument::Indented)).trimmed();
+    return lines.join(QLatin1Char('\n'));
 }

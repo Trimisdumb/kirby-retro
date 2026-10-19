@@ -35,6 +35,7 @@ private:
     void playRow(int row);
     void startLaunch(const QString &system, const QString &romPath);
     void setCover(const QString &system, const QString &file, const QPixmap &pixmap);
+    void showDiagnostic();
 
     QJsonObject m_config;
     Library m_library;

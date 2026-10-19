@@ -50,7 +50,7 @@ jobs:
             --icon-file AppDir/kirby-retro-launcher-cpp.png --plugin qt
           printf '#!/bin/sh\ncd "$(dirname "$0")"\nexec ./AppRun "$@"\n' > AppDir/lancer.sh
           chmod +x AppDir/lancer.sh
-          tar -C AppDir -czf kirby-retro-launcher-cpp-0.1-linux.tar.gz .
+          tar -C AppDir -czf kirby-retro-launcher-cpp-0.2-linux.tar.gz .
       - uses: actions/upload-artifact@v4
         with:
           name: cpp-linux
@@ -78,8 +78,26 @@ jobs:
           cp build-cpp/Release/kirby-retro-launcher-cpp.exe dist/kirby-retro-launcher-cpp/
           windeployqt --release --no-translations --no-system-d3d-compiler \
             dist/kirby-retro-launcher-cpp/kirby-retro-launcher-cpp.exe
-          cd dist && 7z a ../kirby-retro-launcher-cpp-0.1-windows.zip kirby-retro-launcher-cpp
+      - name: Vérifier la détection (dossier « C:\RetroArch-Win64 »)
+        shell: bash
+        run: |
+          set -e
+          # RetroArch factice à l'emplacement par défaut de l'installateur officiel.
+          mkdir -p "/c/RetroArch-Win64/cores"
+          touch "/c/RetroArch-Win64/retroarch.exe"
+          touch "/c/RetroArch-Win64/cores/melondsds_libretro.dll"
+          cd dist/kirby-retro-launcher-cpp
+          ./kirby-retro-launcher-cpp.exe --diagnostic || true
+          cat kirby-retro-diagnostic.txt
+          grep -F 'RetroArch-Win64\retroarch.exe' kirby-retro-diagnostic.txt
+          grep -F 'melondsds_libretro.dll' kirby-retro-diagnostic.txt
+      - name: Archive Windows
+        shell: bash
+        run: |
+          set -e
+          rm -f dist/kirby-retro-launcher-cpp/kirby-retro-diagnostic.txt
+          cd dist && 7z a ../kirby-retro-launcher-cpp-0.2-windows.zip kirby-retro-launcher-cpp
       - uses: actions/upload-artifact@v4
         with:
           name: cpp-windows
-          path: kirby-retro-launcher-cpp-0.1-windows.zip
+          path: kirby-retro-launcher-cpp-0.2-windows.zip

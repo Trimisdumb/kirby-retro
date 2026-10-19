@@ -1,12 +1,44 @@
 #include <QApplication>
+#include <QFile>
 #include <QIcon>
+#include <QJsonObject>
+#include <QTextStream>
 
+#include "app_config.h"
+#include "detect.h"
 #include "mainwindow.h"
 
+#ifndef KIRBY_VERSION
+#define KIRBY_VERSION "0.2.0"
+#endif
+
+// « --diagnostic » : écrit ce que le launcher voit (RetroArch, cores, émulateurs),
+// utilisable sans écran — la fenêtre reste le mode normal.
+static int runDiagnostic() {
+    QJsonObject config = loadConfig();
+    autofill(config);
+    const QString report = diagnosticReport(config);
+    QTextStream out(stdout);
+    out << report << Qt::endl;
+    out.flush();
+    QFile file(QStringLiteral("kirby-retro-diagnostic.txt"));
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        file.write(report.toUtf8());
+        file.write("\n");
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
+    for (int index = 1; index < argc; ++index) {
+        if (QString::fromLocal8Bit(argv[index]) == QLatin1String("--diagnostic")) {
+            return runDiagnostic();
+        }
+    }
+
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Kirby Retro Launcher"));
-    app.setApplicationVersion(QStringLiteral("0.1.0"));
+    app.setApplicationVersion(QStringLiteral(KIRBY_VERSION));
     app.setOrganizationName(QStringLiteral("KirbyRetro"));
     app.setWindowIcon(QIcon(QStringLiteral(":/resources/app-icon.png")));
     app.setStyle(QStringLiteral("Fusion"));
