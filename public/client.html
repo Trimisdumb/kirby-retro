@@ -69,7 +69,9 @@
         standalone (melonDS, DuckStation…). Les ROMs absentes se téléchargent automatiquement depuis le site.
       </p>
       <p class="hint" style="margin-top:-2px">
-        <strong>Nouveau en 1.9.0 :</strong> la console Wii suit partout — <strong>Miis et langue importés</strong>
+        <strong>Nouveau en 1.10.0 :</strong> avec un <strong>Dolphin Bar Mayflash</strong>, la <strong>Wiimote</strong>
+        est configurée automatiquement dans RetroArch — Wiimote réelle au port 1 et <strong>pointeur infrarouge</strong>
+        activés, comme dans Dolphin natif. Depuis 1.9.0 : la console Wii suit partout — <strong>Miis et langue importés</strong>
         dans RetroArch, et les <strong>fichiers système Dolphin</strong> s'installent tout seuls (fini le bandeau
         « codehandler.bin missing »). Depuis 1.8.2 : correctifs <strong>Linux</strong> (certificats SSL, RetroArch
         Flatpak). Depuis 1.8.1 : versions <strong>exécutables autonomes</strong> — Python n'est plus à installer.
@@ -81,19 +83,19 @@
           <strong>🪟 Windows 10 / 11</strong>
           <p>Un seul fichier — télécharge et double-clique. <small>(Windows peut afficher « Windows a protégé
           votre PC » : <em>Informations → Exécuter quand même</em>.)</small></p>
-          <a class="btn" href="/downloads/kirby-retro-launcher-1.9.0-windows.exe" download>⬇ Télécharger le launcher (.exe)</a>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.10.0-windows.exe" download>⬇ Télécharger le launcher (.exe)</a>
         </div>
         <div class="dl-card" id="dl-linux">
           <strong>🐧 Linux</strong>
           <p>Un seul fichier — rends-le exécutable, puis lance-le. <small><code class="inline-code">chmod +x …</code></small></p>
-          <a class="btn" href="/downloads/kirby-retro-launcher-1.9.0-linux" download>⬇ Télécharger le launcher (binaire)</a>
+          <a class="btn" href="/downloads/kirby-retro-launcher-1.10.0-linux" download>⬇ Télécharger le launcher (binaire)</a>
         </div>
       </div>
       <p class="hint">
         Rien à installer à côté pour le launcher lui-même ; <strong>RetroArch + cores</strong> restent nécessaires
         (gratuits) et sont détectés automatiquement. Version Python (si tu préfères) :
-        <a href="/downloads/kirby-retro-launcher-1.9.0.zip">.zip (Windows)</a> ·
-        <a href="/downloads/kirby-retro-launcher-1.9.0.tar.gz">.tar.gz (Linux)</a> — Python 3.10+ et tkinter requis.
+        <a href="/downloads/kirby-retro-launcher-1.10.0.zip">.zip (Windows)</a> ·
+        <a href="/downloads/kirby-retro-launcher-1.10.0.tar.gz">.tar.gz (Linux)</a> — Python 3.10+ et tkinter requis.
       </p>
     </section>
 
@@ -120,6 +122,27 @@
       et le même dossier de ROMs : tu peux tester sans rien reconfigurer.</p>
     </section>
 
+    <section class="panel" id="mobile">
+      <h2>📱 Kirby Retro mobile — téléphone</h2>
+      <p class="muted">
+        Toute la bibliothèque dans la poche : <a href="/mobile.html">la page mobile</a> se joue au doigt
+        (manette tactile intégrée) et s'installe comme une application — bouton <em>Installer</em> dans Chrome
+        sur Android, <em>Partager → Sur l'écran d'accueil</em> sur iPhone.
+      </p>
+      <div class="dl-grid">
+        <div class="dl-card">
+          <strong>🤖 Android — application (aperçu)</strong>
+          <p>Un APK à installer une fois (« sources inconnues » à autoriser) : Kirby Retro s'ouvre en plein écran.</p>
+          <a class="btn" href="/downloads/kirby-retro-mobile-0.1.apk" download>⬇ Télécharger l'APK</a>
+        </div>
+        <div class="dl-card">
+          <strong>🍎 iPhone / iPad</strong>
+          <p>Aucune appli à installer : <a href="/mobile.html">ouvre la page mobile</a> dans Safari,
+          puis <em>Partager → Sur l'écran d'accueil</em>.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="panel steps" id="steps-win">
       <h2>🪟 Installation — Windows</h2>
       <ol>
@@ -137,7 +160,7 @@
         </li>
         <li>
           <strong>Lance le launcher</strong> — double-clic sur
-          <code class="inline-code">kirby-retro-launcher-1.9.0-windows.exe</code>. La fenêtre s'ouvre,
+          <code class="inline-code">kirby-retro-launcher-1.10.0-windows.exe</code>. La fenêtre s'ouvre,
           la bibliothèque se charge et RetroArch est détecté automatiquement.
         </li>
         <li>
@@ -159,8 +182,8 @@
       <ol>
         <li>
           <strong>Télécharge le launcher</strong> (bouton binaire ci-dessus), rends-le exécutable et lance-le :
-          <pre><code>chmod +x kirby-retro-launcher-1.9.0-linux
-./kirby-retro-launcher-1.9.0-linux</code></pre>
+          <pre><code>chmod +x kirby-retro-launcher-1.10.0-linux
+./kirby-retro-launcher-1.10.0-linux</code></pre>
           La bibliothèque se charge ; RetroArch et les cores sont détectés automatiquement : paquet système
           (dnf/apt/pacman), Flatpak, snap, portable — cores cherchés dans
           <code class="inline-code">~/.config/retroarch/cores</code>, <code class="inline-code">/usr/lib*/libretro</code>,
@@ -181,7 +204,7 @@ flatpak install flathub org.libretro.RetroArch</code></pre>
         </li>
         <li>
           <strong>(Recommandé) Associe les liens du site</strong> :
-          <pre><code>./kirby-retro-launcher-1.9.0-linux install-protocol</code></pre>
+          <pre><code>./kirby-retro-launcher-1.10.0-linux install-protocol</code></pre>
           Aucun droit root nécessaire. Tu peux aussi le faire via
           <em>Paramètres → « Associer les liens kirbyretro:// »</em>.
         </li>
@@ -254,7 +277,7 @@ flatpak install flathub org.libretro.RetroArch</code></pre>
       <details class="faq">
         <summary>Sur Linux : « Aucun émulateur configuré » ou « core introuvable »</summary>
         <p>
-          Mets à jour le launcher en <strong>1.9.0</strong> : il détecte RetroArch installé par
+          Mets à jour le launcher en <strong>1.10.0</strong> : il détecte RetroArch installé par
           <code class="inline-code">dnf</code>, <code class="inline-code">apt</code>, <code class="inline-code">pacman</code>,
           Flatpak, snap ou en archive, et cherche les cores dans <code class="inline-code">~/.config/retroarch/cores</code>,
           <code class="inline-code">/usr/lib*/libretro</code> et le dossier déclaré dans
@@ -295,7 +318,7 @@ flatpak install flathub org.libretro.RetroArch</code></pre>
       <details class="faq">
         <summary>Comment jouer en ligne avec un ami ? (netplay)</summary>
         <p>
-          Mets à jour le launcher en <strong>1.9.0</strong> chez vous deux, puis :
+          Mets à jour le launcher en <strong>1.10.0</strong> chez vous deux, puis :
         </p>
         <ol>
           <li>L'un de vous sélectionne le jeu et clique <strong>🌐 En ligne → Héberger</strong>.</li>
@@ -352,7 +375,7 @@ flatpak install flathub org.libretro.RetroArch</code></pre>
   <footer class="wrap foot">
     <div class="foot-row">
       <p><a href="/">← Retour à la bibliothèque</a> · <a href="/upload.html">Ajouter une ROM</a> · <a href="/licenses.html">licences</a> · <a href="#" onclick="event.preventDefault();window.avertissementLegal();">informations légales</a></p>
-      <p class="muted">Kirby Retro Launcher v1.9.0</p>
+      <p class="muted">Kirby Retro Launcher v1.10.0</p>
     </div>
   </footer>
 

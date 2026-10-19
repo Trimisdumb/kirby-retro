@@ -11,6 +11,15 @@ Le site reste le catalogue (style Wii). Ce programme **lance les jeux en local**
 
 Plus d’émulation WASM lourde dans le navigateur pour ces machines.
 
+## Nouveautés v1.10.0
+
+- **Manette Wii (Wiimote) automatique** : avec un Dolphin Bar Mayflash, le launcher
+  configure RetroArch tout seul avant un lancement Wii — Wiimote réelle au port 1,
+  recherche continue et **pointeur infrarouge** activés, comme dans Dolphin natif.
+  (Paramètres → « Manette Wii… » pour vérifier l'accès et, si besoin, autoriser le
+  Dolphin Bar avec le mot de passe administrateur.)
+- Les lancements GameCube rendent le port 1 à une manette classique.
+
 ## Nouveautés v1.9.0
 
 - **Données de la console Wii importées** : les **Miis** et les **réglages** (dont la langue du système)

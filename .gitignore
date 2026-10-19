@@ -23,6 +23,13 @@ launcher/out/
 # C++ / Qt
 launcher-cpp/build/
 
+# Android (construit par la CI, jamais versionné)
+android/.gradle/
+android/build/
+android/app/build/
+android/out/
+android/local.properties
+
 # Divers
 node_modules/
 *.log

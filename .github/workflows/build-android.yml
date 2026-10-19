@@ -1,0 +1,50 @@
+name: Application Android (aperçu)
+
+# À la demande, ou automatiquement sur un tag « mobile-v… ».
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "mobile-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Plateforme SDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "platforms;android-34" "build-tools;34.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Construction de l'APK (debug)
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Renommage
+        working-directory: android
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk out/kirby-retro-mobile-0.1.apk
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kirby-retro-mobile-apk
+          path: android/out/*
+          if-no-files-found: error

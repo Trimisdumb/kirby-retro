@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from . import wiimote
 from .api import download_rom
 from .config import subprocess_env
 from .cores import RETROARCH_CORES
@@ -149,6 +150,7 @@ def launch_retroarch(
         return False
     core = _resolve_core(ra, system)
     _ensure_ra_sysfiles(config, system, core, progress)
+    wiimote.on_launch(config, system, core, progress)
     note = auto_sync_before_launch(config, system, rom.name, rom_path=rom, to_retroarch=True)
     if note and progress:
         progress(note)
@@ -185,6 +187,7 @@ def launch_netplay(
         )
     core = _resolve_core(ra, system)
     _ensure_ra_sysfiles(config, system, core, progress)
+    wiimote.on_launch(config, system, core, progress)
     note = auto_sync_before_launch(config, system, file, rom_path=rom, to_retroarch=True)
     if note and progress:
         progress(note)

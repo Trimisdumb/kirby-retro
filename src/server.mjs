@@ -94,6 +94,8 @@ const MIME = {
   ".zip": "application/zip",
   ".txt": "text/plain; charset=utf-8",
   ".md": "text/plain; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".apk": "application/vnd.android.package-archive",
 };
 
 const mimeFor = (file) => MIME[extname(file).toLowerCase()] || "application/octet-stream";

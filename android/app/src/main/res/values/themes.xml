@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.KirbyRetro" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#eef8fd</item>
+        <item name="android:statusBarColor">#7ec8e8</item>
+        <item name="android:navigationBarColor">#eef8fd</item>
+    </style>
+</resources>

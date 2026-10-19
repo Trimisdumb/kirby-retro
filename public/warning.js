@@ -5,7 +5,7 @@
   var KEY = "kirbyretro-avertissement-vu";
   var CSS = [
     ".avertissement-overlay{position:fixed;inset:0;background:#0f2233cc;display:flex;align-items:center;justify-content:center;padding:1rem;z-index:9999}",
-    ".avertissement-boite{background:#fff;color:#23394a;max-width:46rem;max-height:86vh;overflow:auto;border-radius:16px;padding:1.4rem 1.6rem;box-shadow:0 18px 50px #0008;line-height:1.6}",
+    ".avertissement-boite{background:#fff;color:#23394a;box-sizing:border-box;width:100%;max-width:46rem;max-height:86vh;overflow:auto;border-radius:16px;padding:1.4rem 1.6rem;box-shadow:0 18px 50px #0008;line-height:1.6}",
     ".avertissement-boite h2{margin:0 0 .6rem;color:var(--wii-blue-deep,#2b7eb0);font-size:1.25rem}",
     ".avertissement-boite h3{margin:1.1rem 0 .35rem;color:var(--wii-blue-deep,#2b7eb0);font-size:1.02rem}",
     ".avertissement-boite p{margin:.45rem 0}",
@@ -13,6 +13,7 @@
     ".avertissement-pied button{background:var(--wii-blue,#3a9fd8);color:#fff;border:none;border-radius:999px;padding:.55rem 1.4rem;font-size:1rem;font-weight:600;cursor:pointer;font-family:inherit}",
     ".avertissement-pied button:hover{background:var(--wii-blue-deep,#2b7eb0)}",
     ".avertissement-mail{font-weight:700}",
+    "@media (max-width:520px){.avertissement-overlay{padding:.6rem}.avertissement-boite{padding:1rem 1rem .9rem}.avertissement-boite h2{font-size:1.1rem}}",
   ].join("");
   var CONTENU = [
     "<h3>À propos du projet</h3>",

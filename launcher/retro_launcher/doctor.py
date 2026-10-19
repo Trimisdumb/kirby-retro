@@ -11,6 +11,7 @@ from .cores import RETROARCH_CORES
 from .detect import autofill, cores_dirs, resolve_core_path, retroarch_executable_ok
 from .netplay import candidate_addresses
 from .protocol import status as protocol_status
+from . import wiimote
 
 CHECK_SYSTEMS = (
     "nes", "snes", "gb", "gba", "nds", "n64", "psx", "ps2", "psp",
@@ -97,6 +98,17 @@ def collect() -> str:
         lines.append(f"Netplay    : [OK] — adresses pour héberger : {listing} (port 55435)")
     else:
         lines.append("Netplay    : [OK] — aucune adresse détectée (Tailscale/réseau) ; le port UDP 55435 reste utilisable")
+
+    state = wiimote.status()
+    bar = "Dolphin Bar détecté" if state["bar"] else "Dolphin Bar non détecté"
+    if state["access"] is True:
+        access = "accès OK"
+    elif state["access"] is False:
+        access = "accès refusé (règle udev à installer)"
+    else:
+        access = "accès non vérifiable (Wiimote éteinte ?)"
+    conf = "configuré" if state["configured"] else "à configurer (Paramètres → Manette Wii…)"
+    lines.append(f"Wiimote    : {bar} — {access} — RetroArch {conf}")
 
     lines.append(f"Protocole  : {protocol_status()}")
     return "\n".join(lines)

@@ -592,8 +592,13 @@ class LauncherApp(tk.Tk):
                         text="Installer les fichiers système Dolphin manquants pour RetroArch (Wii)",
                         variable=sysfiles_var).grid(row=6, column=0, columnspan=3,
                                                     sticky="w", pady=(2, 2))
+        wiimote_var = tk.BooleanVar(value=bool(cfg.get("configure_wiimote", False)))
+        ttk.Checkbutton(body,
+                        text="Manette Wii : configurer la Wiimote réelle + pointeur au lancement (Dolphin Bar)",
+                        variable=wiimote_var).grid(row=7, column=0, columnspan=3,
+                                                   sticky="w", pady=(2, 2))
         ttk.Label(body, text="Le pseudo et le port netplay se règlent dans « Jouer en ligne ».",
-                  style="Dim.TLabel").grid(row=7, column=0, columnspan=3, sticky="w")
+                  style="Dim.TLabel").grid(row=8, column=0, columnspan=3, sticky="w")
 
         def save() -> None:
             cfg["site_url"] = site_var.get().strip() or "https://retro.kirbytrim.buzz"
@@ -601,6 +606,7 @@ class LauncherApp(tk.Tk):
             cfg["download_missing_roms"] = bool(download_var.get())
             cfg["auto_sync_saves"] = bool(auto_var.get())
             cfg["install_dolphin_sysfiles"] = bool(sysfiles_var.get())
+            cfg["configure_wiimote"] = bool(wiimote_var.get())
             cfg.setdefault("retroarch", {})
             cfg["retroarch"]["path"] = ra_var.get().strip()
             cfg["retroarch"]["cores_dir"] = cores_var.get().strip()
@@ -611,8 +617,10 @@ class LauncherApp(tk.Tk):
             self.refresh_library()
 
         buttons = ttk.Frame(body)
-        buttons.grid(row=8, column=0, columnspan=3, sticky="ew", pady=(16, 0))
+        buttons.grid(row=9, column=0, columnspan=3, sticky="ew", pady=(16, 0))
         ttk.Button(buttons, text="Diagnostic…", command=self.open_doctor).pack(side="left")
+        ttk.Button(buttons, text="Manette Wii…",
+                   command=self._wiimote_dialog).pack(side="left", padx=8)
         ttk.Button(buttons, text="Associer kirbyretro://",
                    command=self._install_protocol).pack(side="left", padx=8)
         ttk.Button(buttons, text="Enregistrer", command=save).pack(side="right")
@@ -649,6 +657,55 @@ class LauncherApp(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
         ttk.Button(body, text="Fermer", command=win.destroy).pack(side="right", pady=(10, 0))
+
+    def _wiimote_dialog(self) -> None:
+        from . import wiimote
+
+        win, body = self._dialog("Manette Wii — Dolphin Bar", 640, 330)
+        info = tk.Label(body, text="", justify="left", anchor="w")
+        info.pack(fill="x", pady=(0, 10))
+
+        def refresh() -> None:
+            state = wiimote.status()
+            bar = "oui" if state["bar"] else "non (branche le Dolphin Bar en USB)"
+            if state["access"] is True:
+                access = "OK"
+            elif state["access"] is False:
+                access = "refusé — clique sur « Autoriser le Dolphin Bar »"
+            else:
+                access = "non vérifiable (allume la Wiimote avec le bouton SYNC)"
+            conf = "à jour" if state["configured"] else "sera appliqué au prochain lancement Wii"
+            info.configure(text=(
+                f"Dolphin Bar branché : {bar}\n"
+                f"Accès du système : {access}\n"
+                f"Configuration RetroArch : {conf}\n\n"
+                "Dans RetroArch, la Wiimote pilote le joueur 1, pointeur inclus\n"
+                "(comme dans Dolphin natif). Règle au besoin la position de la\n"
+                "sensor bar dans les options du core Dolphin."
+            ))
+
+        def apply_now() -> None:
+            note = wiimote.apply()
+            self._set_status(note or "Manette Wii : RetroArch était déjà configuré")
+            refresh()
+
+        def allow() -> None:
+            try:
+                message = wiimote.install_udev_rule()
+            except Exception as exc:  # noqa: BLE001
+                self._show_error(f"Règle Dolphin Bar : {exc}")
+                return
+            self._set_status(message)
+            refresh()
+
+        buttons = ttk.Frame(body)
+        buttons.pack(fill="x")
+        ttk.Button(buttons, text="Configurer RetroArch maintenant",
+                   command=apply_now).pack(side="left")
+        ttk.Button(buttons, text="Autoriser le Dolphin Bar (mot de passe)",
+                   command=allow).pack(side="left", padx=8)
+        ttk.Button(buttons, text="Fermer", command=win.destroy).pack(side="right")
+        refresh()
 
     def _about(self) -> None:
         win, body = self._dialog("À propos", 560, 280)
