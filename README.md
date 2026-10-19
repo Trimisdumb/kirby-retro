@@ -126,8 +126,21 @@ Launcher natif multiplateforme (Python + Tkinter, sans dépendance) servi sur **
   `./run.sh install-protocol` / `run.bat install-protocol` (Linux `.desktop` + xdg-mime ;
   Windows `HKCU\Software\Classes\kirbyretro`, + HKLM si admin) ;
 - diagnostic intégré : `./run.sh doctor` / `run.bat doctor` (config, site, cores, protocole) ;
+- **manette Wii** : avec un Dolphin Bar Mayflash, le launcher configure RetroArch automatiquement
+  au lancement (Wiimote réelle au port 1, recherche continue, **pointeur IR**) — la fenêtre
+  *Paramètres → Manette Wii…* vérifie l'accès au dongle et propose la règle udev si besoin ;
 - portage **C++/Qt 6** en cours dans `launcher-cpp/` (mêmes serveurs, même config) — la version
   Python reste la version livrée le temps du portage.
+
+## Client mobile (`public/mobile.html` + `android/`)
+
+- **Page mobile** `/mobile.html` : la bibliothèque en version tactile, jouable au doigt
+  (manette virtuelle d'EmulatorJS), avec sauvegardes navigateur comme sur le site.
+  Elle est **installable comme PWA** (`public/manifest.webmanifest` + `public/sw.js`) :
+  bouton *Installer* sur Android, *Partager → Sur l'écran d'accueil* sur iPhone.
+- **Application Android (aperçu)** dans `android/` : petite WebView plein écran sur
+  `/mobile.html` (écran maintenu allumé, vidéo plein écran, retour géré). L'APK est
+  construit par la CI (`.github/workflows/build-android.yml`, aperçu signé en debug).
 
 ## Stabilité et modes d'exécution
 
