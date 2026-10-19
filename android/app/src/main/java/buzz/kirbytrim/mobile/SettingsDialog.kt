@@ -74,10 +74,13 @@ class SettingsDialog(
         val packageName = Emulators.findRetroArch(activity)
         emulator.packageName = packageName
         lines.add(
-            if (packageName == null) {
-                "RetroArch : introuvable — installe RetroArch (ou RetroArch Plus) pour lancer les jeux"
-            } else {
-                "RetroArch : $packageName"
+            when {
+                packageName == null ->
+                    "RetroArch : introuvable — installe RetroArch officiel pour lancer les jeux"
+                !Emulators.canReadSharedStorage(activity, packageName) ->
+                    "RetroArch : ${Emulators.label(activity, packageName)} — version du Play " +
+                        "Store, ne peut pas lire les ROMs (écran noir au lancement)"
+                else -> "RetroArch : ${Emulators.label(activity, packageName)}"
             }
         )
         lines.add(

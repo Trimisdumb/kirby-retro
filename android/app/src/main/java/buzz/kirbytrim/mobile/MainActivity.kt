@@ -275,10 +275,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateStatus() {
         handler.removeCallbacks(resetStatus)
+        val retroarch = emulator.packageName
         statusLine.text = when {
             lastError != null -> "Hors ligne — $lastError"
             !StorageAccess.hasAccess(this) -> "Accès aux fichiers non accordé — Paramètres pour autoriser"
-            emulator.packageName == null -> "RetroArch introuvable — installe-le pour lancer les jeux"
+            retroarch == null -> "RetroArch introuvable — installe-le pour lancer les jeux"
+            !Emulators.canReadSharedStorage(this, retroarch) ->
+                "RetroArch du Play Store : ne peut pas lire les ROMs — utilise la version officielle"
             emulator.coresKnown -> "RetroArch : ${emulator.cores.size} cores installés"
             else -> "RetroArch détecté — détection des cores…"
         }

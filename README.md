@@ -142,6 +142,8 @@ Launcher natif multiplateforme (Python + Tkinter, sans dépendance) servi sur **
   téléchargement des ROMs dans `KirbyRetroROMs/`, lancement dans RetroArch avec le core de la
   console (mêmes idées que le launcher PC ; « Ouvrir avec… » pour un autre émulateur).
   L'APK est construit par la CI (`.github/workflows/build-android.yml`, aperçu signé en debug).
+  Côté téléphone, prendre **RetroArch officiel** (APK AArch64) : la version du Play Store
+  n'a pas l'accès aux fichiers et ne peut pas lire les ROMs.
 
 ## Stabilité et modes d'exécution
 

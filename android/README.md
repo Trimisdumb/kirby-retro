@@ -14,10 +14,15 @@ La même idée que le launcher PC, dans le téléphone :
 
 ## Installer
 
-1. Installer **RetroArch** (ou RetroArch Plus) depuis le Play Store, si ce n'est pas déjà fait.
+1. Installer **RetroArch officiel (AArch64)** — l'APK de
+   [buildbot.libretro.com](https://buildbot.libretro.com/stable/1.22.2/android/RetroArch_aarch64.apk).
+   *Pas* celui du Play Store : « RetroArch Plus » n'a pas la permission « tous les
+   fichiers » (refusée aux applis du magasin) et ne peut pas lire `KirbyRetroROMs/` —
+   le jeu resterait sur un écran noir. Ouvrir RetroArch une fois et autoriser l'accès
+   aux fichiers quand il le demande.
 2. Installer l'APK de Kirby Retro (« sources inconnues » à autoriser) — signé en debug.
 3. Au premier lancement, autoriser **l'accès aux fichiers** (Android 11+ : *Tous les
-   fichiers*), pour que les ROMs soient visibles par RetroArch.
+   fichiers*), pour que les ROMs soient écrites dans le dossier partagé.
 
 ## Construire l'APK
 
@@ -36,14 +41,20 @@ La même idée que le launcher PC, dans le téléphone :
 - Le catalogue vient de `GET /api/library` sur le site (adresse modifiable dans
   Paramètres) ; la dernière réponse est gardée en cache pour démarrer hors ligne.
 - Le lancement passe par l'activité `com.retroarch.browser.retroactivity.RetroActivityFuture`
-  de RetroArch, avec les extras `ROM`, `LIBRETRO` (chemin du core) et `CONFIGFILE` —
-  c'est la façon officieuse utilisée par les frontends Android.
+  de RetroArch, avec les extras `ROM` et `LIBRETRO` (chemin du core) — c'est la façon
+  officieuse utilisée par les frontends Android. L'extra `CONFIGFILE` est volontairement
+  omis : il marque un lancement « venu d'un launcher », et RetroArch saute alors sa
+  demande d'accès aux fichiers (écran noir si l'accès manque).
+- Avant de lancer, l'appli vérifie que le RetroArch installé déclare bien la permission
+  « tous les fichiers » ; sinon elle propose l'APK officiel au lieu d'ouvrir un jeu noir.
 - Les cores sont demandés par diffusion (`com.retroarch.QUERY_INSTALLED_CORES`),
   ce qui évite de deviner les chemins dans les données privées de RetroArch.
 
-## Limites (aperçu 0.2)
+## Limites (aperçu 0.3)
 
 - Pas de sauvegardes synchronisées entre PC et téléphone : RetroArch gère les
   siennes sur le téléphone (le launcher PC continue de synchroniser sur PC).
 - Pas de netplay depuis l'appli (l'interface de RetroArch reste dispo pour ça).
 - L'APK est signé en debug.
+- « RetroArch Plus » du Play Store ne peut pas lire les ROMs hors de son propre
+  dossier : utiliser l'APK officiel (l'appli le rappelle avant de lancer).

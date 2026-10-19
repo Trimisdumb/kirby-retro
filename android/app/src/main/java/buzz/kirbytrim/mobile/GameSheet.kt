@@ -147,6 +147,12 @@ class GameSheet(
         }
         emulator.packageName = packageName
 
+        // Version du Play Store : elle ne peut pas lire KirbyRetroROMs, le jeu
+        // resterait sur un écran noir — mieux vaut le dire avant de lancer.
+        if (!Emulators.canReadSharedStorage(activity, packageName)) {
+            tellRetroArchCannotRead(packageName)
+            return
+        }
         if (prefs.letRetroarchChooseCore) {
             start(packageName, rom, null)
             return
@@ -197,10 +203,34 @@ class GameSheet(
         AlertDialog.Builder(activity)
             .setTitle("RetroArch n'est pas installé")
             .setMessage(
-                "Le launcher lance les jeux dans RetroArch, comme sur PC : " +
-                    "installe RetroArch (ou RetroArch Plus), puis reviens."
+                "Le launcher lance les jeux dans RetroArch, comme sur PC : installe " +
+                    "RetroArch officiel (AArch64), ouvre-le une fois et autorise " +
+                    "l'accès aux fichiers.\n\n" +
+                    "La version du Play Store ne peut pas lire le dossier des ROMs : " +
+                    "les jeux resteraient sur un écran noir."
             )
-            .setPositiveButton("Installer RetroArch") { _, _ -> openStore() }
+            .setPositiveButton("Télécharger RetroArch") { _, _ -> openOfficialRetroArch() }
+            .setNeutralButton(R.string.button_open_with) { _, _ -> onOpenWith() }
+            .setNegativeButton(R.string.button_close, null)
+            .show()
+    }
+
+    /**
+     * Le RetroArch installé (version du Play Store) ne peut pas lire KirbyRetroROMs :
+     * le jeu se lancerait sur un écran noir, sans autre message.
+     */
+    private fun tellRetroArchCannotRead(packageName: String) {
+        val label = Emulators.label(activity, packageName)
+        AlertDialog.Builder(activity)
+            .setTitle("RetroArch ne peut pas lire les ROMs")
+            .setMessage(
+                "$label (version du Play Store) n'a pas l'accès aux fichiers : les jeux " +
+                    "se lanceraient sur un écran noir.\n\n" +
+                    "Désinstalle $label, installe RetroArch officiel ci-dessous, ouvre-le " +
+                    "une fois et autorise l'accès aux fichiers. La bibliothèque et les ROMs " +
+                    "du téléphone ne changent pas."
+            )
+            .setPositiveButton("Télécharger RetroArch officiel") { _, _ -> openOfficialRetroArch() }
             .setNeutralButton(R.string.button_open_with) { _, _ -> onOpenWith() }
             .setNegativeButton(R.string.button_close, null)
             .show()
@@ -238,11 +268,12 @@ class GameSheet(
             .show()
     }
 
-    private fun openStore() {
+    /** APK officiel (buildbot) : celui qui peut lire le dossier des ROMs. */
+    private fun openOfficialRetroArch() {
         try {
-            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Emulators.STORE_URL)))
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(Emulators.officialApkUrl())))
         } catch (error: ActivityNotFoundException) {
-            toast("Magasin d'applications introuvable")
+            toast("Navigateur introuvable")
         }
     }
 
