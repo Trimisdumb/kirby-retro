@@ -54,7 +54,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cpp-linux
-          path: kirby-retro-launcher-cpp-0.1-linux.tar.gz
+          path: kirby-retro-launcher-cpp-0.2-linux.tar.gz
 
   # Windows : Qt officiel (aqt) + MSVC, bibliothèques copiées par windeployqt.
   windows:
