@@ -39,7 +39,7 @@ jobs:
         working-directory: android
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/kirby-retro-mobile-0.1.apk
+          cp app/build/outputs/apk/debug/app-debug.apk out/kirby-retro-mobile-0.2.apk
           ls -la out
 
       - uses: actions/upload-artifact@v4

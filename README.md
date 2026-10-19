@@ -138,9 +138,10 @@ Launcher natif multiplateforme (Python + Tkinter, sans dépendance) servi sur **
   (manette virtuelle d'EmulatorJS), avec sauvegardes navigateur comme sur le site.
   Elle est **installable comme PWA** (`public/manifest.webmanifest` + `public/sw.js`) :
   bouton *Installer* sur Android, *Partager → Sur l'écran d'accueil* sur iPhone.
-- **Application Android (aperçu)** dans `android/` : petite WebView plein écran sur
-  `/mobile.html` (écran maintenu allumé, vidéo plein écran, retour géré). L'APK est
-  construit par la CI (`.github/workflows/build-android.yml`, aperçu signé en debug).
+- **Application Android (aperçu)** dans `android/` : un vrai launcher natif — bibliothèque,
+  téléchargement des ROMs dans `KirbyRetroROMs/`, lancement dans RetroArch avec le core de la
+  console (mêmes idées que le launcher PC ; « Ouvrir avec… » pour un autre émulateur).
+  L'APK est construit par la CI (`.github/workflows/build-android.yml`, aperçu signé en debug).
 
 ## Stabilité et modes d'exécution
 

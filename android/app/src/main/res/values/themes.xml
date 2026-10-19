@@ -1,7 +1,17 @@
-<resources>
-    <style name="Theme.KirbyRetro" parent="@android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#eef8fd</item>
-        <item name="android:statusBarColor">#7ec8e8</item>
-        <item name="android:navigationBarColor">#eef8fd</item>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.KirbyRetro" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/wii_blue</item>
+        <item name="colorOnPrimary">#ffffff</item>
+        <item name="colorPrimaryContainer">@color/wii_blue_soft</item>
+        <item name="colorOnPrimaryContainer">@color/wii_text</item>
+        <item name="colorSecondary">@color/wii_blue_deep</item>
+        <item name="colorOnSecondary">#ffffff</item>
+        <item name="android:windowBackground">@color/wii_sky_bottom</item>
+        <item name="android:statusBarColor">@color/wii_blue_deep</item>
+        <item name="android:navigationBarColor">@color/wii_sky_bottom</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:textColorPrimary">@color/wii_text</item>
     </style>
+
 </resources>

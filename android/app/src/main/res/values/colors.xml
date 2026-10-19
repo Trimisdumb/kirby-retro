@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palette reprise du site (bleu « chaîne Wii »). -->
+    <color name="wii_blue">#3a9fd8</color>
+    <color name="wii_blue_deep">#2b7eb0</color>
+    <color name="wii_blue_soft">#e3f2fa</color>
+    <color name="wii_sky_bottom">#e8f6fc</color>
+    <color name="wii_text">#2a3a4a</color>
+    <color name="wii_muted">#5a7080</color>
+    <color name="wii_green">#6cbc4a</color>
+    <color name="wii_danger">#e07070</color>
+    <color name="wii_cover">#dceaf5</color>
+</resources>

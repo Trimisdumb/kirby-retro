@@ -1,3 +1,29 @@
 <resources>
     <string name="app_name">Kirby Retro</string>
+    <string name="library_loading">bibliothèque…</string>
+    <string name="search_hint">Rechercher un jeu…</string>
+    <string name="filter_all">Toutes</string>
+    <string name="action_refresh">Actualiser</string>
+    <string name="action_settings">Paramètres</string>
+    <string name="button_play">▶ Jouer</string>
+    <string name="button_download">⬇ Télécharger</string>
+    <string name="button_delete">Supprimer</string>
+    <string name="button_open_with">Ouvrir avec une autre appli…</string>
+    <string name="button_cancel">Annuler</string>
+    <string name="button_close">Fermer</string>
+    <string name="button_save">Enregistrer</string>
+    <string name="state_downloaded">✓ déjà téléchargé</string>
+    <string name="state_missing">pas encore téléchargé</string>
+    <string name="need_access">Autorise l\'accès aux fichiers, puis retente</string>
+    <string name="download_first">Télécharge d\'abord la ROM</string>
+    <string name="downloaded">Téléchargé : %1$s</string>
+    <string name="core_auto">Automatique (selon la console)</string>
+    <string name="core_pick_title">Core pour %1$s</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_site">Adresse du site</string>
+    <string name="settings_roms">Dossier des ROMs</string>
+    <string name="settings_core_auto">Laisser RetroArch choisir son core</string>
+    <string name="settings_access">Autoriser l\'accès aux fichiers</string>
+    <string name="settings_reset_cores">Réinitialiser les cores choisis</string>
+    <string name="game_cover">Jaquette</string>
 </resources>
